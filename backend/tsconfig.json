@@ -9,5 +9,5 @@
     "strict": true,
     "outDir": "dist"
   },
-  "include": ["src", "prisma/seed.ts"]
+  "include": ["src", "prisma/seed.mjs"]
 }
