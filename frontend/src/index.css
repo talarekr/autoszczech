@@ -2,4 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Twój globalny styl (opcjonalnie) */
 :root { color-scheme: dark; }
+body { @apply bg-neutral-950 text-neutral-100; }
