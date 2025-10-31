@@ -1,8 +1,5 @@
 {
   "name": "autoszczech",
   "private": true,
-  "workspaces": ["backend", "frontend"],
-  "scripts": {
-    "postinstall": "cd backend && npm i && cd ../frontend && npm i"
-  }
+  "workspaces": ["backend", "frontend"]
 }
