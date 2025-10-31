@@ -4,9 +4,9 @@ import helmet from "helmet";
 import morgan from "morgan";
 import "dotenv/config";
 
-import authRoutes from "./routes/auth";
-import carRoutes from "./routes/cars";
-import offerRoutes from "./routes/offers";
+import authRoutes from "./routes/auth.js";
+import carRoutes from "./routes/cars.js";
+import offerRoutes from "./routes/offers.js";
 
 const app = express();
 app.use(express.json());
@@ -21,5 +21,5 @@ app.use("/api/offers", offerRoutes);
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-  console.log(`API on :${PORT}`);
+  console.log(`✅ API running on port: ${PORT}`);
 });
