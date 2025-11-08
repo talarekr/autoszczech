@@ -8,14 +8,15 @@ const r = Router();
 r.post("/", auth("USER"), async (req: AuthReq, res: Response) => {
   const { carId, amount, message } = (req.body || {}) as { carId: number; amount: number; message?: string };
   const offer = await prisma.offer.create({
-    data: { carId: Number(carId), amount: Number(amount), message, userId: req.user!.id }
+    data: { carId: Number(carId), amount: Number(amount), message, userId: req.user!.id },
+    include: { user: true },
   });
   res.json(offer);
 });
 
 // Lista ofert (admin)
 r.get("/", auth("ADMIN"), async (_req: Request, res: Response) => {
-  const offers = await prisma.offer.findMany({ include: { car: true, user: true }, orderBy: { id: "desc" } });
+  const offers = await prisma.offer.findMany({ include: { car: true, user: true }, orderBy: { createdAt: "desc" } });
   res.json(offers);
 });
 

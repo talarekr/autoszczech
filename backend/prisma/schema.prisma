@@ -23,6 +23,7 @@ enum Role {
 
 model Car {
   id           Int        @id @default(autoincrement())
+  externalId   String?    @unique
   make         String
   model        String
   year         Int
@@ -34,6 +35,7 @@ model Car {
   auctionEnd   DateTime?
   images       CarImage[]
   offers       Offer[]
+  specs        Json?
   createdAt    DateTime   @default(now())
 }
 
