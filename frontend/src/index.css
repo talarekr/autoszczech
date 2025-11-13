@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  font-family: 'Manrope', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+body {
+  @apply bg-neutral-100 text-neutral-900 antialiased;
+  font-family: inherit;
+}
+
+a {
+  @apply text-red-600 transition-colors duration-150;
+}
+
+a:hover {
+  @apply text-red-500;
+}
+
+.card {
+  @apply bg-white border border-neutral-200 rounded-3xl p-6 shadow-sm;
+}

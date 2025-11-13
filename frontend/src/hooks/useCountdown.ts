@@ -1,0 +1,79 @@
+import { useEffect, useMemo, useState } from "react";
+
+interface CountdownState {
+  ended: boolean;
+  short: string;
+  long: string;
+  targetDate: Date | null;
+}
+
+function calculateCountdown(target?: string | Date | null): CountdownState {
+  if (!target) {
+    return {
+      ended: true,
+      short: "Brak daty zakończenia",
+      long: "Brak daty zakończenia",
+      targetDate: null
+    };
+  }
+
+  const targetDate = target instanceof Date ? target : new Date(target);
+  const endTime = targetDate.getTime();
+
+  if (Number.isNaN(endTime)) {
+    return {
+      ended: true,
+      short: "Brak daty zakończenia",
+      long: "Brak daty zakończenia",
+      targetDate: null
+    };
+  }
+
+  const diff = endTime - Date.now();
+
+  if (diff <= 0) {
+    return {
+      ended: true,
+      short: "Aukcja zakończona",
+      long: "Aukcja zakończona",
+      targetDate
+    };
+  }
+
+  const totalMinutes = Math.floor(diff / (1000 * 60));
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const minutes = totalMinutes % 60;
+
+  const long = `${days > 0 ? `${days} dni ` : ""}${hours.toString().padStart(2, "0")}h ${minutes
+    .toString()
+    .padStart(2, "0")}m`;
+  let short: string;
+  if (days > 0) short = `${days} dni ${hours} godz.`;
+  else if (hours > 0) short = `${hours} godz. ${minutes.toString().padStart(2, "0")} min.`;
+  else short = `${minutes} min.`;
+
+  return {
+    ended: false,
+    short,
+    long,
+    targetDate
+  };
+}
+
+export function useCountdown(target?: string | Date | null): CountdownState {
+  const [state, setState] = useState<CountdownState>(() => calculateCountdown(target));
+
+  useEffect(() => {
+    setState(calculateCountdown(target));
+    if (!target) return;
+
+    const interval = window.setInterval(() => {
+      setState(calculateCountdown(target));
+    }, 1000);
+
+    return () => window.clearInterval(interval);
+  }, [target]);
+
+  return useMemo(() => state, [state]);
+}
