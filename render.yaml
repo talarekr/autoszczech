@@ -1,0 +1,51 @@
+services:
+  - type: web
+    name: autoszczech-backend
+    env: node
+    plan: starter
+    buildCommand: >-
+      npm install &&
+      npm run build --prefix backend &&
+      npm run prisma:migrate --prefix backend &&
+      npm run prisma:seed --prefix backend
+    startCommand: cd backend && node dist/backend/src/start.js
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: autoszczech-db
+          property: connectionString
+      - key: JWT_SECRET
+        value: superSekretnyKlucz
+      - key: PORT
+        value: "10000"
+      - key: PUBLIC_BACKEND_URL
+        value: https://autoszczech.ch
+      - key: FTP_IMPORT_ENABLED
+        value: "true"
+      - key: FTP_HOST
+        value: hosting2580517.online.pro
+      - key: FTP_PORT
+        value: "21"
+      - key: FTP_USER
+        value: hosting2580517
+      - key: FTP_PASSWORD
+        value: autoszczech12!!
+      - key: FTP_JSON_DIRECTORY
+        value: uploads/json
+      - key: FTP_IMAGE_DIRECTORY
+        value: uploads/images
+      - key: FTP_POLL_INTERVAL_MS
+        value: "1800000"
+      - key: FTP_LOCAL_IMAGE_DIR
+        value: /opt/render/project/src/backend/storage/ftp-images
+      - key: FTP_MAX_DOWNLOAD_MB
+        value: "25"
+    disk:
+      name: ftp-import-cache
+      mountPath: /opt/render/project/src/backend/storage
+      sizeGB: 1
+databases:
+  - name: autoszczech-db
+    databaseName: autoszczech
+    user: autoszczech
+    plan: free

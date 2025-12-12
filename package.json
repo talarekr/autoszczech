@@ -1,0 +1,5 @@
+{
+  "name": "autoszczech",
+  "private": true,
+  "workspaces": ["backend", "frontend"]
+}
