@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 160" role="img" aria-labelledby="title">
+  <title id="title">Autoszczech</title>
+  <g fill="none" stroke="#d9251f" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M28 82c54-34 120-52 188-52 72 0 141 20 208 52" />
+    <path d="M90 112c50-20 98-30 146-30 54 0 107 12 158 30" />
+  </g>
+  <text x="50%" y="138" font-family="'Manrope', 'Helvetica Neue', Arial, sans-serif" font-size="64" font-weight="600" text-anchor="middle" fill="#d9251f">AUTOSZCZECH</text>
+</svg>

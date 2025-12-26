@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3000 250" role="img" aria-labelledby="title desc" fill="none" preserveAspectRatio="xMidYMid meet" overflow="visible">
+  <title id="title">Auto-Szczech logo</title>
+  <desc id="desc">Mountain outline with a car silhouette and the Auto-Szczech Import Szwajcaria logotype.</desc>
+  <g stroke="#0f172a" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" transform="matrix(1.1 0 0 0.45 0 20)">
+    <path d="M78 338l158-148 152 148 168-174 176 174 182-182 174 182 170-152 144 152" />
+    <path d="M162 354c118-90 258-126 430-120 182 6 334 70 430 110 68-12 142-18 222-18 166 0 302 42 389 88" />
+  </g>
+  <g stroke="#0f172a" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" transform="matrix(1.1 0 0 0.45 0 20)">
+    <path d="M202 356c72-52 182-92 322-92 170 0 318 74 360 100" />
+    <path d="M1200 370c24-64 96-102 186-102 86 0 158 42 188 102" />
+  </g>
+  <text x="1290" y="190" font-family="'Montserrat','Inter','Arial Black',sans-serif" font-size="140" font-weight="800" font-style="italic" fill="#e42320" letter-spacing="6" transform="matrix(1.1 0 0 0.45 0 20)">AUTO - SZCZECH</text>
+  <text x="1388" y="280" font-family="'Montserrat','Inter','Arial Black',sans-serif" font-size="64" font-weight="700" fill="#1c3f95" letter-spacing="10" transform="matrix(1.1 0 0 0.45 0 20)">IMPORT SZWAJCARIA</text>
+</svg>

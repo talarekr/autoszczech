@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Car" ADD COLUMN "adminDismissed" BOOLEAN NOT NULL DEFAULT FALSE;
