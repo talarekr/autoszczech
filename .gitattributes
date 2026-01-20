@@ -1,0 +1,9 @@
+# Exclude heavy deployment artifacts from `git archive` exports
+autoszczech-*.tar.gz export-ignore
+autoszczech-*.tar.xz export-ignore
+autoszczech-*.zip export-ignore
+autoszczech-*.b64 export-ignore
+autoszczech-*.b64.single export-ignore
+codex.tar.xz export-ignore
+codex.b64 export-ignore
+codex.tar.zst export-ignore
