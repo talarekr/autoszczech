@@ -6,8 +6,7 @@ services:
     buildCommand: >-
       npm install &&
       npm run build --prefix backend &&
-      npm run prisma:migrate --prefix backend &&
-      npm run prisma:seed --prefix backend
+      npm run prisma:migrate --prefix backend
     startCommand: cd backend && node dist/backend/src/start.js
     envVars:
       - key: DATABASE_URL
@@ -37,12 +36,12 @@ services:
       - key: FTP_POLL_INTERVAL_MS
         value: "1800000"
       - key: FTP_LOCAL_IMAGE_DIR
-        value: /opt/render/project/src/backend/storage/ftp-images
+        value: /var/data/uploads
       - key: FTP_MAX_DOWNLOAD_MB
         value: "25"
     disk:
-      name: ftp-import-cache
-      mountPath: /opt/render/project/src/backend/storage
+      name: uploads
+      mountPath: /var/data
       sizeGB: 1
 databases:
   - name: autoszczech-db

@@ -7,6 +7,7 @@ export interface FtpImporterConfig {
   password?: string;
   jsonDirectory: string;
   imageDirectory: string;
+  batchSize: number;
   pollMs: number;
   imageBaseUrl: string;
   fallbackProvider?: string;
@@ -25,7 +26,7 @@ const sanitizeDirectory = (value: string | undefined, fallback: string): string 
 const resolveLocalImageDir = (value: string | undefined): string => {
   const candidate = (value ?? "").trim();
   if (!candidate) {
-    return path.resolve("storage/ftp-images");
+    return "/var/data/uploads";
   }
   return path.isAbsolute(candidate) ? candidate : path.resolve(candidate);
 };
@@ -60,6 +61,7 @@ export const parseFtpEnvConfig = (): FtpImporterConfig => {
   const pollMs = process.env.FTP_POLL_INTERVAL_MS
     ? Number(process.env.FTP_POLL_INTERVAL_MS)
     : 1_800_000;
+  const batchSize = process.env.FTP_BATCH_SIZE ? Number(process.env.FTP_BATCH_SIZE) : 50;
   const maxBytes = process.env.FTP_MAX_DOWNLOAD_MB
     ? Number(process.env.FTP_MAX_DOWNLOAD_MB) * 1024 * 1024
     : 25 * 1024 * 1024;
@@ -75,6 +77,7 @@ export const parseFtpEnvConfig = (): FtpImporterConfig => {
     password: process.env.FTP_PASSWORD ?? "autoszczech12!!",
     jsonDirectory: sanitizeDirectory(process.env.FTP_JSON_DIRECTORY, "uploads/json"),
     imageDirectory: sanitizeDirectory(process.env.FTP_IMAGE_DIRECTORY, "uploads/images"),
+    batchSize: Number.isFinite(batchSize) && batchSize > 0 ? batchSize : 50,
     pollMs: Number.isFinite(pollMs) && pollMs > 0 ? pollMs : 1_800_000,
     imageBaseUrl: normalizeBaseUrl(process.env.FTP_PUBLIC_IMAGE_BASE),
     fallbackProvider: process.env.FTP_FALLBACK_PROVIDER ?? undefined,

@@ -51,6 +51,34 @@ const resolveCurlAuthArgs = (config: FtpImporterConfig) => {
   return ["--user", `${config.user ?? ""}:${config.password ?? ""}`];
 };
 
+const chunkArray = <T>(items: T[], size: number): T[][] => {
+  if (size <= 0) return [items];
+  const result: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    result.push(items.slice(index, index + size));
+  }
+  return result;
+};
+
+const runWithConcurrency = async <T>(
+  items: T[],
+  limit: number,
+  handler: (item: T) => Promise<void>
+) => {
+  const safeLimit = Math.max(1, Math.min(limit, items.length || 1));
+  let index = 0;
+
+  const workers = Array.from({ length: safeLimit }, async () => {
+    while (index < items.length) {
+      const current = items[index];
+      index += 1;
+      await handler(current);
+    }
+  });
+
+  await Promise.all(workers);
+};
+
 const listRemoteFiles = async (config: FtpImporterConfig, directory: string): Promise<string[]> => {
   const url = buildUrl(config, undefined, directory, { includeCredentials: false });
   if (!url.pathname.endsWith("/")) {
@@ -218,7 +246,7 @@ const resolveDisplayId = (
 const normalizeImageEntries = async (
   config: FtpImporterConfig,
   payload: Record<string, unknown>,
-  context: { checksum: string; prefix: string; provider?: string; filename?: string }
+  context: { checksum: string; prefix: string; provider?: string; filename?: string; imageConcurrency: number }
 ): Promise<{ payload: Record<string, unknown> | null }> => {
   const rawImages = Array.isArray(payload["offer_images"])
     ? (payload["offer_images"] as unknown[]).filter((value): value is string =>
@@ -242,14 +270,7 @@ const normalizeImageEntries = async (
   await ensureDir(targetDir);
 
   const seen = new Set<string>();
-  const successfulDownloads: {
-    index: number;
-    originalName: string;
-    relativePath: string;
-  }[] = [];
-
-  for (let index = 0; index < rawImages.length; index += 1) {
-    const remoteName = rawImages[index];
+  const downloadQueue = rawImages.map((remoteName, index) => {
     let safeFileName = sanitizeFileName(remoteName, `zdjecie-${index + 1}`);
     if (seen.has(safeFileName)) {
       const base = path.basename(safeFileName, path.extname(safeFileName));
@@ -261,7 +282,16 @@ const normalizeImageEntries = async (
       }
     }
     seen.add(safeFileName);
+    return { remoteName, index, safeFileName };
+  });
 
+  const successfulDownloads: {
+    index: number;
+    originalName: string;
+    relativePath: string;
+  }[] = [];
+
+  await runWithConcurrency(downloadQueue, context.imageConcurrency, async ({ remoteName, index, safeFileName }) => {
     try {
       const buffer = await downloadRemoteFile(config, remoteName, config.imageDirectory);
       const absolutePath = path.join(targetDir, safeFileName);
@@ -276,7 +306,7 @@ const normalizeImageEntries = async (
       const err = error instanceof Error ? error : new Error(String(error));
       console.error(context.prefix, `Failed to fetch image ${remoteName}:`, err.message);
     }
-  }
+  });
 
   const attemptCount = rawImages.length;
   const sortedDownloads = successfulDownloads.sort((a, b) => a.index - b.index);
@@ -325,7 +355,7 @@ const normalizeImageEntries = async (
 const preparePayload = async (
   config: FtpImporterConfig,
   payload: unknown,
-  context: { checksum: string; prefix: string; provider?: string; filename?: string }
+  context: { checksum: string; prefix: string; provider?: string; filename?: string; imageConcurrency: number }
 ): Promise<unknown> => {
   if (!payload || typeof payload !== "object") {
     return payload;
@@ -335,11 +365,7 @@ const preparePayload = async (
     const transformed: Record<string, unknown>[] = [];
     for (const entry of payload) {
       if (entry && typeof entry === "object") {
-        const normalized = await normalizeImageEntries(
-          config,
-          entry as Record<string, unknown>,
-          context
-        );
+        const normalized = await normalizeImageEntries(config, entry as Record<string, unknown>, context);
         if (normalized.payload) {
           transformed.push(normalized.payload);
         }
@@ -366,6 +392,14 @@ let lastRun: { at: Date; result: FtpImportReport; config: FtpImporterConfig } | 
 
 const runImportCycle = async (config: FtpImporterConfig): Promise<FtpImportReport> => {
   const prefix = "[ftp-importer]";
+  const batchConcurrency = Math.min(
+    8,
+    Math.max(1, Number(process.env.FTP_BATCH_CONCURRENCY ?? "5"))
+  );
+  const imageConcurrency = Math.min(
+    8,
+    Math.max(1, Number(process.env.FTP_IMAGE_CONCURRENCY ?? "3"))
+  );
   const report: FtpImportReport = {
     filesSeen: 0,
     processed: 0,
@@ -375,66 +409,98 @@ const runImportCycle = async (config: FtpImporterConfig): Promise<FtpImportRepor
     errors: [],
   };
 
+  console.info(
+    prefix,
+    `Starting import with batchSize=${config.batchSize}, batchConcurrency=${batchConcurrency}, imageConcurrency=${imageConcurrency}, imageDirectory=${config.imageDirectory}`
+  );
+
   const files = await listRemoteFiles(config, config.jsonDirectory);
-  report.filesSeen = files.length;
+  const jsonFiles = files.filter((name) => name.toLowerCase().endsWith(".json"));
+  report.filesSeen = jsonFiles.length;
 
   const forceImport = (await prisma.car.count()) === 0;
   if (forceImport) {
     console.info(prefix, "Car table empty; forcing re-import of all FTP JSON files");
   }
 
-  for (const rawName of files) {
-    if (!rawName.toLowerCase().endsWith(".json")) {
-      continue;
-    }
-    const relativePath = joinPath(config.jsonDirectory, rawName);
-    try {
-      const buffer = await downloadRemoteFile(config, rawName, config.jsonDirectory);
-      const checksum = createHash("sha256").update(buffer).digest("hex");
-      const existing = await prisma.importJob.findUnique({ where: { filename: relativePath } });
+  const batches = chunkArray(jsonFiles, config.batchSize);
 
-      if (shouldSkip(existing, checksum, forceImport)) {
-        continue;
-      }
+  for (let batchIndex = 0; batchIndex < batches.length; batchIndex += 1) {
+    const batch = batches[batchIndex];
+    const batchReport = {
+      batchSize: batch.length,
+      processed: 0,
+      added: 0,
+      updated: 0,
+      skipped: 0,
+      errors: 0,
+    };
 
-      let summary;
+    const processFile = async (rawName: string) => {
+      const relativePath = joinPath(config.jsonDirectory, rawName);
       try {
-        const payload = JSON.parse(buffer.toString("utf-8"));
-        const provider = resolveProviderFromFilename(rawName, config.fallbackProvider);
-        const normalizedPayload = await preparePayload(config, payload, {
-          checksum,
+        const buffer = await downloadRemoteFile(config, rawName, config.jsonDirectory);
+        const checksum = createHash("sha256").update(buffer).digest("hex");
+        const existing = await prisma.importJob.findUnique({ where: { filename: relativePath } });
+
+        if (shouldSkip(existing, checksum, forceImport)) {
+          continue;
+        }
+
+        let summary;
+        try {
+          const payload = JSON.parse(buffer.toString("utf-8"));
+          const provider = resolveProviderFromFilename(rawName, config.fallbackProvider);
+          const normalizedPayload = await preparePayload(config, payload, {
+            checksum,
+            prefix,
+            provider,
+            filename: relativePath,
+            imageConcurrency,
+          });
+          summary = await importInsurancePayload(normalizedPayload, {
+            imageBaseUrl: config.imageBaseUrl,
+            fallbackProvider: provider,
+          });
+        } catch (error) {
+          const err = error instanceof Error ? error : new Error(String(error));
+          await recordErrorJob(relativePath, checksum, err);
+          report.errors.push({ file: relativePath, message: err.message });
+          batchReport.errors += 1;
+          console.error(prefix, `Failed to import ${relativePath}:`, err.message);
+          continue;
+        }
+
+        report.processed += 1;
+        report.added += summary.added;
+        report.updated += summary.updated;
+        report.skipped += summary.skipped;
+
+        batchReport.processed += 1;
+        batchReport.added += summary.added;
+        batchReport.updated += summary.updated;
+        batchReport.skipped += summary.skipped;
+
+        await recordImportJob(relativePath, checksum, summary);
+        console.info(
           prefix,
-          provider,
-          filename: relativePath,
-        });
-        summary = await importInsurancePayload(normalizedPayload, {
-          imageBaseUrl: config.imageBaseUrl,
-          fallbackProvider: provider,
-        });
+          `Imported ${relativePath}: added=${summary.added}, updated=${summary.updated}, skipped=${summary.skipped}`
+        );
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
-        await recordErrorJob(relativePath, checksum, err);
+        console.error(prefix, `Unhandled error processing ${relativePath}:`, err.message);
         report.errors.push({ file: relativePath, message: err.message });
-        console.error(prefix, `Failed to import ${relativePath}:`, err.message);
-        continue;
+        batchReport.errors += 1;
+        await recordErrorJob(relativePath, null, err);
       }
+    };
 
-      report.processed += 1;
-      report.added += summary.added;
-      report.updated += summary.updated;
-      report.skipped += summary.skipped;
+    await runWithConcurrency(batch, batchConcurrency, processFile);
 
-      await recordImportJob(relativePath, checksum, summary);
-      console.info(
-        prefix,
-        `Imported ${relativePath}: added=${summary.added}, updated=${summary.updated}, skipped=${summary.skipped}`
-      );
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      console.error(prefix, `Unhandled error processing ${relativePath}:`, err.message);
-      report.errors.push({ file: relativePath, message: err.message });
-      await recordErrorJob(relativePath, null, err);
-    }
+    console.info(
+      prefix,
+      `Batch ${batchIndex + 1}/${batches.length} summary: batchSize=${batchReport.batchSize}, processed=${batchReport.processed}, added=${batchReport.added}, updated=${batchReport.updated}, skipped=${batchReport.skipped}, errors=${batchReport.errors}`
+    );
   }
 
   return report;

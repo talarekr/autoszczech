@@ -169,25 +169,43 @@ export const importInsurancePayload = async (
         importedAt: new Date(),
       } as const;
 
-        if (existing) {
-          await tx.car.update({
-            where: { id: existing.id },
-            data: {
-              ...baseData,
-              price: baseData.price,
-              seats: baseData.seats,
-              doors: baseData.doors,
-            },
-          });
-        await tx.carImage.deleteMany({ where: { carId: existing.id } });
+      if (existing) {
+        await tx.car.update({
+          where: { id: existing.id },
+          data: {
+            ...baseData,
+            price: baseData.price,
+            seats: baseData.seats,
+            doors: baseData.doors,
+          },
+        });
+
         if (seed.images.length > 0) {
-          await tx.carImage.createMany({
-            data: seed.images.map((image) => ({
-              carId: existing.id,
-              url: image.url,
-              order: image.order,
-            })),
+          const existingImages = await tx.carImage.findMany({
+            where: { carId: existing.id },
+            select: { id: true, url: true, order: true },
           });
+          const existingByUrl = new Map(existingImages.map((image) => [image.url, image]));
+
+          for (const image of seed.images) {
+            const match = existingByUrl.get(image.url);
+            if (match) {
+              if (match.order !== image.order) {
+                await tx.carImage.update({
+                  where: { id: match.id },
+                  data: { order: image.order },
+                });
+              }
+            } else {
+              await tx.carImage.create({
+                data: {
+                  carId: existing.id,
+                  url: image.url,
+                  order: image.order,
+                },
+              });
+            }
+          }
         }
         summary.updated += 1;
       } else {
