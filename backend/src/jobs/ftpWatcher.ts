@@ -95,7 +95,11 @@ const listRemoteFiles = async (config: FtpImporterConfig, directory: string): Pr
     .filter(Boolean);
 };
 
-const downloadRemoteFile = async (config: FtpImporterConfig, name: string, directory: string): Promise<Buffer> => {
+const downloadRemoteFile = async (
+  config: FtpImporterConfig,
+  name: string,
+  directory: string
+): Promise<Buffer> => {
   const url = buildUrl(config, name, directory, { includeCredentials: false });
   const args = ["--silent", "--show-error", "--fail", ...resolveCurlAuthArgs(config), url.href];
   const { stdout } = await execFileAsync("curl", args, {
@@ -392,14 +396,8 @@ let lastRun: { at: Date; result: FtpImportReport; config: FtpImporterConfig } | 
 
 const runImportCycle = async (config: FtpImporterConfig): Promise<FtpImportReport> => {
   const prefix = "[ftp-importer]";
-  const batchConcurrency = Math.min(
-    8,
-    Math.max(1, Number(process.env.FTP_BATCH_CONCURRENCY ?? "5"))
-  );
-  const imageConcurrency = Math.min(
-    8,
-    Math.max(1, Number(process.env.FTP_IMAGE_CONCURRENCY ?? "3"))
-  );
+  const batchConcurrency = Math.min(8, Math.max(1, Number(process.env.FTP_BATCH_CONCURRENCY ?? "5")));
+  const imageConcurrency = Math.min(8, Math.max(1, Number(process.env.FTP_IMAGE_CONCURRENCY ?? "3")));
   const report: FtpImportReport = {
     filesSeen: 0,
     processed: 0,
@@ -443,11 +441,16 @@ const runImportCycle = async (config: FtpImporterConfig): Promise<FtpImportRepor
         const checksum = createHash("sha256").update(buffer).digest("hex");
         const existing = await prisma.importJob.findUnique({ where: { filename: relativePath } });
 
+        // ✅ FIX: continue -> return (bo jesteśmy wewnątrz funkcji, nie pętli)
         if (shouldSkip(existing, checksum, forceImport)) {
-          continue;
+          report.skipped += 1;
+          batchReport.skipped += 1;
+          return;
         }
 
-        let summary;
+        // ✅ FIX: summary typowany + nie może pozostać "undefined"
+        let summary: Awaited<ReturnType<typeof importInsurancePayload>> | null = null;
+
         try {
           const payload = JSON.parse(buffer.toString("utf-8"));
           const provider = resolveProviderFromFilename(rawName, config.fallbackProvider);
@@ -458,6 +461,7 @@ const runImportCycle = async (config: FtpImporterConfig): Promise<FtpImportRepor
             filename: relativePath,
             imageConcurrency,
           });
+
           summary = await importInsurancePayload(normalizedPayload, {
             imageBaseUrl: config.imageBaseUrl,
             fallbackProvider: provider,
@@ -468,7 +472,11 @@ const runImportCycle = async (config: FtpImporterConfig): Promise<FtpImportRepor
           report.errors.push({ file: relativePath, message: err.message });
           batchReport.errors += 1;
           console.error(prefix, `Failed to import ${relativePath}:`, err.message);
-          continue;
+          return;
+        }
+
+        if (!summary) {
+          return;
         }
 
         report.processed += 1;
@@ -512,7 +520,18 @@ export const runFtpImportOnce = async (
   const config = configOverride ?? parseFtpEnvConfig();
 
   if (running) {
-    return { running: true, report: lastRun?.result ?? { filesSeen: 0, processed: 0, added: 0, updated: 0, skipped: 0, errors: [] } };
+    return {
+      running: true,
+      report:
+        lastRun?.result ?? {
+          filesSeen: 0,
+          processed: 0,
+          added: 0,
+          updated: 0,
+          skipped: 0,
+          errors: [],
+        },
+    };
   }
 
   running = true;
@@ -563,9 +582,6 @@ export const startFtpImportLoop = async (configOverride?: FtpImporterConfig) => 
   if (typeof timer.unref === "function") {
     timer.unref();
   }
-  console.info(
-    prefix,
-    `Watching ftp://${config.host}${config.jsonDirectory ? `/${config.jsonDirectory}` : ""}`
-  );
+  console.info(prefix, `Watching ftp://${config.host}${config.jsonDirectory ? `/${config.jsonDirectory}` : ""}`);
   return { stop: () => clearInterval(timer) };
 };
