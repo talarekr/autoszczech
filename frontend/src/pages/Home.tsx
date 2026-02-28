@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { useTranslation } from "react-i18next";
 
@@ -17,6 +18,20 @@ type SortOption = "endingAsc" | "endingDesc" | "newest";
 
 type MessageKey = string | null;
 
+const parseSortOption = (value: string | null): SortOption => {
+  if (value === "endingAsc" || value === "endingDesc" || value === "newest") {
+    return value;
+  }
+  return "endingAsc";
+};
+
+const parseProviderOption = (value: string | null): InsuranceProviderKey | "" => {
+  if (!value) return "";
+  return orderedInsuranceProviders.includes(value as InsuranceProviderKey)
+    ? (value as InsuranceProviderKey)
+    : "";
+};
+
 const isAuctionActive = (car: Car) => {
   if (!car.auctionEnd) return true;
   const end = new Date(car.auctionEnd).getTime();
@@ -25,23 +40,36 @@ const isAuctionActive = (car: Car) => {
 
 export default function Home() {
   const { cars, replaceBaseCars } = useInventory();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState<boolean>(false);
   const [errorKey, setErrorKey] = useState<MessageKey>(null);
   const [statusMessageKey, setStatusMessageKey] = useState<MessageKey>(null);
   const [usingSampleData, setUsingSampleData] = useState<boolean>(
     () => cars.length === 0 || cars.every((car) => (car.source ?? "").toLowerCase() === "sample")
   );
-  const [searchTerm, setSearchTerm] = useState("");
-  const [yearFrom, setYearFrom] = useState("");
-  const [yearTo, setYearTo] = useState("");
-  const [sort, setSort] = useState<SortOption>("endingAsc");
-  const [provider, setProvider] = useState<InsuranceProviderKey | "">("");
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get("q") ?? "");
+  const [yearFrom, setYearFrom] = useState(() => searchParams.get("yearFrom") ?? "");
+  const [yearTo, setYearTo] = useState(() => searchParams.get("yearTo") ?? "");
+  const [sort, setSort] = useState<SortOption>(() => parseSortOption(searchParams.get("sort")));
+  const [provider, setProvider] = useState<InsuranceProviderKey | "">(() => parseProviderOption(searchParams.get("provider")));
   const { t } = useTranslation();
 
   const providerOptions = useMemo(
     () => orderedInsuranceProviders.map((key) => ({ key, label: t(`home.search.providers.${key}`) })),
     [t]
   );
+
+  useEffect(() => {
+    const next = new URLSearchParams();
+
+    if (searchTerm.trim()) next.set("q", searchTerm.trim());
+    if (yearFrom.trim()) next.set("yearFrom", yearFrom.trim());
+    if (yearTo.trim()) next.set("yearTo", yearTo.trim());
+    if (sort !== "endingAsc") next.set("sort", sort);
+    if (provider) next.set("provider", provider);
+
+    setSearchParams(next, { replace: true });
+  }, [provider, searchTerm, setSearchParams, sort, yearFrom, yearTo]);
 
   useEffect(() => {
     let cancelled = false;
@@ -220,8 +248,8 @@ export default function Home() {
                 type="button"
                 onClick={() => {
                   setSearchTerm("");
-                  setYearFrom("2008");
-                  setYearTo("2024");
+                  setYearFrom("");
+                  setYearTo("");
                   setSort("endingAsc");
                   setProvider("");
                 }}

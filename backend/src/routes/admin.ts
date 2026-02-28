@@ -83,6 +83,8 @@ r.patch("/auctions/:id/dismiss", auth("ADMIN"), async (req: Request, res: Respon
 
 r.get("/users", auth("ADMIN"), async (req: Request, res: Response) => {
   const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
+  const dateFrom = typeof req.query.dateFrom === "string" ? req.query.dateFrom.trim() : "";
+  const dateTo = typeof req.query.dateTo === "string" ? req.query.dateTo.trim() : "";
   const status =
     typeof req.query.status === "string" && req.query.status.toUpperCase() === RegistrationStatus.PENDING
       ? RegistrationStatus.PENDING
@@ -100,6 +102,28 @@ r.get("/users", auth("ADMIN"), async (req: Request, res: Response) => {
       { firstName: { contains: search, mode: "insensitive" } },
       { lastName: { contains: search, mode: "insensitive" } },
     ];
+  }
+
+  const createdAtFilter: Prisma.DateTimeFilter = {};
+
+  if (dateFrom) {
+    const parsedFrom = new Date(`${dateFrom}T00:00:00.000Z`);
+    if (Number.isNaN(parsedFrom.getTime())) {
+      return res.status(400).json({ error: "Nieprawidłowa data początkowa" });
+    }
+    createdAtFilter.gte = parsedFrom;
+  }
+
+  if (dateTo) {
+    const parsedTo = new Date(`${dateTo}T23:59:59.999Z`);
+    if (Number.isNaN(parsedTo.getTime())) {
+      return res.status(400).json({ error: "Nieprawidłowa data końcowa" });
+    }
+    createdAtFilter.lte = parsedTo;
+  }
+
+  if (Object.keys(createdAtFilter).length > 0) {
+    where.createdAt = createdAtFilter;
   }
 
   const users = await prisma.user.findMany({
