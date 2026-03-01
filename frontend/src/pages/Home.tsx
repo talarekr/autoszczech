@@ -26,7 +26,6 @@ type CarsListResponse = {
   cars: Car[];
 };
 
-const CARS_REQUEST_TIMEOUT_MS = 10_000;
 const CACHED_CARS_KEY = "autoszczech.cachedCars";
 
 const readCachedCars = (): Car[] => {
@@ -96,7 +95,7 @@ export default function Home() {
     [t]
   );
 
-  useEffect(() => {
+  const nextSearchParams = useMemo(() => {
     const next = new URLSearchParams();
 
     if (searchTerm.trim()) next.set("q", searchTerm.trim());
@@ -105,8 +104,13 @@ export default function Home() {
     if (sort !== "endingAsc") next.set("sort", sort);
     if (provider) next.set("provider", provider);
 
-    setSearchParams(next, { replace: true });
-  }, [provider, searchTerm, setSearchParams, sort, yearFrom, yearTo]);
+    return next;
+  }, [provider, searchTerm, sort, yearFrom, yearTo]);
+
+  useEffect(() => {
+    if (nextSearchParams.toString() === searchParams.toString()) return;
+    setSearchParams(nextSearchParams, { replace: true });
+  }, [nextSearchParams, searchParams, setSearchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -117,7 +121,6 @@ export default function Home() {
       try {
         const apiUrl = await getApiUrl();
         const response = await axios.get<CarsListResponse>(`${apiUrl}/api/cars`, {
-          timeout: CARS_REQUEST_TIMEOUT_MS,
           params: {
             page: 1,
           },
