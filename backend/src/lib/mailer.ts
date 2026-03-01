@@ -55,33 +55,7 @@ const formatAmount = (amount?: number | null) => {
 };
 
 const readResponse = async (socket: net.Socket | tls.TLSSocket, expectedCode: number) => {
-  const data = await new Promise<Buffer>((resolve, reject) => {
-    const cleanup = () => {
-      socket.off("data", onData);
-      socket.off("error", onError);
-      socket.off("timeout", onTimeout);
-    };
-
-    const onData = (chunk: Buffer) => {
-      cleanup();
-      resolve(chunk);
-    };
-
-    const onError = (error: Error) => {
-      cleanup();
-      reject(error);
-    };
-
-    const onTimeout = () => {
-      cleanup();
-      reject(new Error("SMTP socket timeout while waiting for response"));
-    };
-
-    socket.once("data", onData);
-    socket.once("error", onError);
-    socket.once("timeout", onTimeout);
-  });
-
+  const [data] = (await once(socket, "data")) as [Buffer];
   const message = data.toString().trim();
 
   if (!message.startsWith(String(expectedCode))) {
@@ -362,7 +336,7 @@ export const sendBidPlacedEmails = async ({
   const lastName = typeof userLastName === "string" ? userLastName.trim() : "";
   const fullName = `${firstName} ${lastName}`.trim();
 
-  const clientSent = await sendMail({
+  const clientMailPromise = sendMail({
     kind: "bid_placed_client",
     to: userEmail,
     subject: `Potwierdzenie złożenia oferty – ${carName}`,
@@ -386,7 +360,7 @@ export const sendBidPlacedEmails = async ({
     meta: { auctionUrl, amount: formattedAmount, date },
   });
 
-  const officeSent = await sendMail({
+  const officeMailPromise = sendMail({
     kind: "bid_placed_office",
     to: officeEmailRecipient,
     subject: `Potwierdzenie złożenia oferty – ${carName}`,
@@ -404,5 +378,6 @@ export const sendBidPlacedEmails = async ({
     meta: { auctionUrl, amount: formattedAmount, date, userEmail, fullName },
   });
 
+  const [clientSent, officeSent] = await Promise.all([clientMailPromise, officeMailPromise]);
   return { clientSent, officeSent };
 };
