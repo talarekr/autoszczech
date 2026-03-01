@@ -71,6 +71,18 @@ const parsePositiveInt = (value: unknown, fallback: number) => {
   return normalized > 0 ? normalized : fallback;
 };
 
+const parseOptionalPositiveInt = (value: unknown) => {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return undefined;
+
+  const normalized = Math.floor(parsed);
+  return normalized > 0 ? normalized : undefined;
+};
+
 const toThumbnailUrl = (url: string) => {
   const trimmed = url.trim();
   if (!trimmed) return trimmed;
@@ -83,9 +95,9 @@ const r = Router();
 
 r.get("/", async (req: Request, res: Response) => {
   const page = parsePositiveInt(req.query.page, 1);
-  const requestedLimit = parsePositiveInt(req.query.limit, 24);
-  const limit = Math.min(requestedLimit, 48);
-  const skip = (page - 1) * limit;
+  const requestedLimit = parseOptionalPositiveInt(req.query.limit);
+  const limit = requestedLimit ? Math.min(requestedLimit, 2000) : undefined;
+  const skip = limit ? (page - 1) * limit : 0;
 
   const [total, cars] = await Promise.all([
     prisma.car.count(),
@@ -97,8 +109,7 @@ r.get("/", async (req: Request, res: Response) => {
         },
       },
       orderBy: { id: "desc" },
-      skip,
-      take: limit,
+      ...(limit ? { skip, take: limit } : {}),
     }),
   ]);
 
@@ -112,11 +123,12 @@ r.get("/", async (req: Request, res: Response) => {
     };
   });
 
-  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const effectiveLimit = limit ?? Math.max(total, 1);
+  const totalPages = limit ? Math.max(1, Math.ceil(total / limit)) : 1;
 
   res.json({
     page,
-    limit,
+    limit: effectiveLimit,
     total,
     totalPages,
     cars: carsWithThumbnails,

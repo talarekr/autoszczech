@@ -120,7 +120,6 @@ export default function Home() {
           timeout: CARS_REQUEST_TIMEOUT_MS,
           params: {
             page: 1,
-            limit: 24,
           },
         });
 
