@@ -11,7 +11,39 @@
 - Jeśli wolisz konfigurację ręczną:
   - Utwórz usługę PostgreSQL w Render i skopiuj `DATABASE_URL`.
   - **Build Command:** `npm run prisma:generate && npm run prisma:migrate && npm run prisma:seed`
-  - **Start Command:** `npm run start`
+  - **Start Command:** `npm run start:prod`
+
+### Weryfikacja migracji i indeksów na produkcji (Render)
+Po deployu możesz potwierdzić, że indeksy zostały założone i są używane przez zapytanie listy ofert:
+
+1. Wejdź do shell-a usługi backendu na Render.
+2. Uruchom:
+
+```bash
+cd backend
+npm run prisma:migrate
+```
+
+3. Sprawdź indeksy:
+
+```sql
+SELECT indexname, indexdef
+FROM pg_indexes
+WHERE tablename IN ('Car', 'CarImage', 'Offer', 'Favorite')
+ORDER BY tablename, indexname;
+```
+
+4. Sprawdź plan zapytania (czy używa indeksu zamiast sekwencyjnego skanu):
+
+```sql
+EXPLAIN ANALYZE
+SELECT c.id, c."auctionEnd", c."createdAt"
+FROM "Car" c
+WHERE c."adminDismissed" = false
+  AND (c."auctionEnd" IS NULL OR c."auctionEnd" > NOW())
+ORDER BY c."auctionEnd" ASC, c."createdAt" DESC
+LIMIT 24 OFFSET 0;
+```
 
 ## 3) Vercel (frontend)
 - Importuj folder `frontend/`
