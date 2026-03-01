@@ -3,7 +3,7 @@ import { Prisma, WinnerStatus } from "@prisma/client";
 
 import prisma from "../lib/prisma.js";
 import { auth, AuthReq } from "../middleware/auth.js";
-import { sendWinnerEmail } from "../lib/mailer.js";
+import { sendAuctionAwardedEmail, sendAuctionWinnerEmail, sendBidPlacedEmails } from "../lib/mailer.js";
 
 const r = Router();
 
@@ -56,6 +56,23 @@ r.post("/", auth("USER"), async (req: AuthReq, res: Response) => {
     const offer = await prisma.offer.create({
       data: { carId: car.id, amount: parsedAmount, message, userId: req.user!.id }
     });
+
+    const bidder = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: { email: true, firstName: true, lastName: true },
+    });
+
+    if (bidder?.email) {
+      void sendBidPlacedEmails({
+        userEmail: bidder.email,
+        userFirstName: bidder.firstName,
+        userLastName: bidder.lastName,
+        carName: `${car.make} ${car.model} (${car.displayId})`,
+        amount: parsedAmount,
+        auctionId: car.displayId,
+        placedAt: offer.createdAt,
+      });
+    }
 
     res.json(offer);
   } catch (error) {
@@ -121,15 +138,23 @@ r.patch("/:id/winner", auth("ADMIN"), async (req: AuthReq, res: Response) => {
       include: { user: true },
     });
 
-    const fullName = [updated.user.firstName, updated.user.lastName].filter(Boolean).join(" ").trim();
+    const carName = `${offer.car.make} ${offer.car.model} (${offer.car.displayId})`;
 
-    void sendWinnerEmail({
-      to: updated.user.email,
-      userName: fullName || undefined,
-      carLabel: `${offer.car.make} ${offer.car.model} (${offer.car.displayId})`,
-      amount: updated.amount,
-      status: winnerStatus as WinnerStatus,
-    });
+    if ((winnerStatus as WinnerStatus) === WinnerStatus.AWARDED) {
+      void sendAuctionAwardedEmail({
+        to: updated.user.email,
+        carName,
+        amount: updated.amount,
+        auctionId: offer.car.displayId,
+      });
+    } else {
+      void sendAuctionWinnerEmail({
+        to: updated.user.email,
+        carName,
+        amount: updated.amount,
+        auctionId: offer.car.displayId,
+      });
+    }
 
     res.json(updated);
   } catch (error) {
