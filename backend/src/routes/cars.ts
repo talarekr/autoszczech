@@ -79,44 +79,6 @@ const toThumbnailUrl = (url: string) => {
   return `${trimmed}${trimmed.includes("?") ? "&" : "?"}w=400`;
 };
 
-type CarsStatusFilter = "active" | "ended" | "all";
-
-const parseStatusFilter = (value: unknown): CarsStatusFilter => {
-  if (typeof value !== "string") return "active";
-  const normalized = value.toLowerCase();
-  if (normalized === "ended" || normalized === "all") return normalized;
-  return "active";
-};
-
-const CARS_COUNT_CACHE_TTL_MS = 30_000;
-let carsCountCache:
-  | {
-      key: string;
-      value: number;
-      expiresAt: number;
-    }
-  | null = null;
-
-const getCarsCountCached = async (where: Prisma.CarWhereInput, cacheKey: string) => {
-  const now = Date.now();
-  if (carsCountCache && carsCountCache.key === cacheKey && carsCountCache.expiresAt > now) {
-    return carsCountCache.value;
-  }
-
-  const started = Date.now();
-  const value = await prisma.car.count({ where });
-  const elapsed = Date.now() - started;
-  console.info(`[cars] count query took ${elapsed}ms key=${cacheKey}`);
-
-  carsCountCache = {
-    key: cacheKey,
-    value,
-    expiresAt: now + CARS_COUNT_CACHE_TTL_MS,
-  };
-
-  return value;
-};
-
 const r = Router();
 
 r.get("/", async (req: Request, res: Response) => {
@@ -124,40 +86,21 @@ r.get("/", async (req: Request, res: Response) => {
   const requestedLimit = parsePositiveInt(req.query.limit, 24);
   const limit = Math.min(requestedLimit, 48);
   const skip = (page - 1) * limit;
-  const status = parseStatusFilter(req.query.status);
-  const now = new Date();
 
-  const where: Prisma.CarWhereInput = {
-    adminDismissed: false,
-  };
-
-  if (status === "active") {
-    where.OR = [{ auctionEnd: null }, { auctionEnd: { gt: now } }];
-  } else if (status === "ended") {
-    where.auctionEnd = { lte: now };
-  }
-
-  const cacheKey = JSON.stringify({ status });
-
-  const countPromise = getCarsCountCached(where, cacheKey);
-
-  const findStarted = Date.now();
-  const carsPromise = prisma.car.findMany({
-    where,
-    include: {
-      images: {
-        orderBy: { order: "asc" },
-        take: 1,
+  const [total, cars] = await Promise.all([
+    prisma.car.count(),
+    prisma.car.findMany({
+      include: {
+        images: {
+          orderBy: { order: "asc" },
+          take: 1,
+        },
       },
-    },
-    orderBy: [{ auctionEnd: "asc" }, { createdAt: "desc" }],
-    skip,
-    take: limit,
-  });
-
-  const [total, cars] = await Promise.all([countPromise, carsPromise]);
-  const findElapsed = Date.now() - findStarted;
-  console.info(`[cars] findMany query took ${findElapsed}ms page=${page} limit=${limit} status=${status}`);
+      orderBy: { id: "desc" },
+      skip,
+      take: limit,
+    }),
+  ]);
 
   const carsWithThumbnails = cars.map((car) => {
     const firstImage = car.images[0];
@@ -174,7 +117,6 @@ r.get("/", async (req: Request, res: Response) => {
   res.json({
     page,
     limit,
-    status,
     total,
     totalPages,
     cars: carsWithThumbnails,
