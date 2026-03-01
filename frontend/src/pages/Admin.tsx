@@ -718,7 +718,7 @@ export default function Admin() {
                   <h3 className="text-lg font-semibold text-neutral-900">{t("admin.clients.searchTitle")}</h3>
                   <p className="text-sm text-neutral-600">{t("admin.clients.searchDescription")}</p>
                   <div className="space-y-3">
-                    <div className="flex flex-col gap-2 sm:grid sm:grid-cols-[1fr_auto_auto] sm:items-center">
+                    <div className="flex flex-col gap-2 sm:flex-row">
                       <input
                         type="search"
                         value={clientSearch}
@@ -735,20 +735,20 @@ export default function Admin() {
                       <button
                         type="button"
                         onClick={handleSearchClients}
-                        className="shrink-0 rounded-full bg-neutral-900 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-white shadow-sm transition hover:bg-neutral-800"
+                        className="shrink-0 rounded-full bg-neutral-900 px-5 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-white shadow-sm transition hover:bg-neutral-800"
                       >
                         {t("admin.clients.searchCta")}
                       </button>
                       <button
                         type="button"
                         onClick={handleShowAllClients}
-                        className="shrink-0 rounded-full bg-red-600 px-3 py-1.5 text-[11px] font-semibold whitespace-nowrap text-white shadow-sm transition hover:bg-red-700"
+                        className="shrink-0 rounded-full bg-red-600 px-5 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-white shadow-sm transition hover:bg-red-700"
                       >
                         {t("admin.clients.showAllCta")}
                       </button>
                     </div>
 
-                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto_auto] sm:items-end">
+                    <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto] sm:items-end">
                       <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">
                         <span>{t("admin.clients.dateFrom")}</span>
                         <input
@@ -771,14 +771,14 @@ export default function Admin() {
                       <button
                         type="button"
                         onClick={handleDateFilter}
-                        className="w-full rounded-full bg-neutral-900 px-3 py-1.5 text-[11px] font-semibold whitespace-nowrap text-white shadow-sm transition hover:bg-neutral-800 lg:w-auto"
+                        className="rounded-full bg-neutral-900 px-5 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-white shadow-sm transition hover:bg-neutral-800"
                       >
                         {t("admin.clients.filterDateCta")}
                       </button>
                       <button
                         type="button"
                         onClick={handleClearDateFilter}
-                        className="w-full rounded-full border border-neutral-300 bg-white px-3 py-1.5 text-[11px] font-semibold whitespace-nowrap text-neutral-700 shadow-sm transition hover:bg-neutral-100 lg:w-auto"
+                        className="rounded-full border border-neutral-300 bg-white px-5 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-neutral-700 shadow-sm transition hover:bg-neutral-100"
                       >
                         {t("admin.clients.clearDateCta")}
                       </button>
