@@ -735,14 +735,14 @@ export default function Admin() {
                       <button
                         type="button"
                         onClick={handleSearchClients}
-                        className="shrink-0 rounded-full bg-neutral-900 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-white shadow-sm transition hover:bg-neutral-800"
+                        className="shrink-0 rounded-full bg-neutral-900 px-5 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-white shadow-sm transition hover:bg-neutral-800"
                       >
                         {t("admin.clients.searchCta")}
                       </button>
                       <button
                         type="button"
                         onClick={handleShowAllClients}
-                        className="shrink-0 rounded-full bg-red-600 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-white shadow-sm transition hover:bg-red-700"
+                        className="shrink-0 rounded-full bg-red-600 px-5 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-white shadow-sm transition hover:bg-red-700"
                       >
                         {t("admin.clients.showAllCta")}
                       </button>
@@ -771,14 +771,14 @@ export default function Admin() {
                       <button
                         type="button"
                         onClick={handleDateFilter}
-                        className="rounded-full bg-neutral-900 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-white shadow-sm transition hover:bg-neutral-800"
+                        className="rounded-full bg-neutral-900 px-5 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-white shadow-sm transition hover:bg-neutral-800"
                       >
                         {t("admin.clients.filterDateCta")}
                       </button>
                       <button
                         type="button"
                         onClick={handleClearDateFilter}
-                        className="rounded-full border border-neutral-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-neutral-700 shadow-sm transition hover:bg-neutral-100"
+                        className="rounded-full border border-neutral-300 bg-white px-5 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-neutral-700 shadow-sm transition hover:bg-neutral-100"
                       >
                         {t("admin.clients.clearDateCta")}
                       </button>

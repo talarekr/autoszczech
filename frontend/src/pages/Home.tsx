@@ -32,33 +32,6 @@ const parseProviderOption = (value: string | null): InsuranceProviderKey | "" =>
     : "";
 };
 
-
-const CACHED_CARS_KEY = "autoszczech.cachedCars.v1";
-const CARS_REQUEST_TIMEOUT_MS = 1500;
-
-const loadCachedCars = (): Car[] => {
-  if (typeof window === "undefined") return [];
-
-  try {
-    const raw = window.localStorage.getItem(CACHED_CARS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as Car[]) : [];
-  } catch {
-    return [];
-  }
-};
-
-const persistCachedCars = (carsToCache: Car[]) => {
-  if (typeof window === "undefined") return;
-
-  try {
-    window.localStorage.setItem(CACHED_CARS_KEY, JSON.stringify(carsToCache));
-  } catch {
-    // ignore storage errors
-  }
-};
-
 const isAuctionActive = (car: Car) => {
   if (!car.auctionEnd) return true;
   const end = new Date(car.auctionEnd).getTime();
@@ -74,7 +47,6 @@ export default function Home() {
   const [usingSampleData, setUsingSampleData] = useState<boolean>(
     () => cars.length === 0 || cars.every((car) => (car.source ?? "").toLowerCase() === "sample")
   );
-  const [cachedCars] = useState<Car[]>(() => loadCachedCars());
   const [searchTerm, setSearchTerm] = useState(() => searchParams.get("q") ?? "");
   const [yearFrom, setYearFrom] = useState(() => searchParams.get("yearFrom") ?? "");
   const [yearTo, setYearTo] = useState(() => searchParams.get("yearTo") ?? "");
@@ -86,13 +58,6 @@ export default function Home() {
     () => orderedInsuranceProviders.map((key) => ({ key, label: t(`home.search.providers.${key}`) })),
     [t]
   );
-
-  useEffect(() => {
-    if (cars.length > 0 || cachedCars.length === 0) return;
-
-    replaceBaseCars(cachedCars, "api");
-    setUsingSampleData(false);
-  }, [cachedCars, cars.length, replaceBaseCars]);
 
   useEffect(() => {
     const next = new URLSearchParams();
