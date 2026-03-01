@@ -3,6 +3,7 @@ import { Prisma, RegistrationStatus } from "@prisma/client";
 
 import prisma from "../lib/prisma.js";
 import { auth } from "../middleware/auth.js";
+import { sendAccountApprovedEmail } from "../lib/mailer.js";
 
 const insurers = ["AXA", "ALLIANZ", "SCC", "BEST", "REST"] as const;
 
@@ -159,6 +160,11 @@ r.patch("/users/:id/approve", auth("ADMIN"), async (req: Request, res: Response)
         registrationStatus: true,
         createdAt: true,
       },
+    });
+
+    void sendAccountApprovedEmail({
+      to: user.email,
+      firstName: user.firstName,
     });
 
     res.json(user);
