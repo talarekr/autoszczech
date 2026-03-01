@@ -64,14 +64,63 @@ const normalizeImages = (images: unknown): { url: string; order: number }[] => {
     .filter((entry): entry is { url: string; order: number } => Boolean(entry?.url));
 };
 
+const parsePositiveInt = (value: unknown, fallback: number) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  const normalized = Math.floor(parsed);
+  return normalized > 0 ? normalized : fallback;
+};
+
+const toThumbnailUrl = (url: string) => {
+  const trimmed = url.trim();
+  if (!trimmed) return trimmed;
+  if (!/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (trimmed.includes("w=")) return trimmed;
+  return `${trimmed}${trimmed.includes("?") ? "&" : "?"}w=400`;
+};
+
 const r = Router();
 
-r.get("/", async (_req: Request, res: Response) => {
-  const cars = await prisma.car.findMany({
-    include: { images: { orderBy: { order: "asc" } } },
-    orderBy: { id: "desc" },
+r.get("/", async (req: Request, res: Response) => {
+  const page = parsePositiveInt(req.query.page, 1);
+  const requestedLimit = parsePositiveInt(req.query.limit, 24);
+  const limit = Math.min(requestedLimit, 48);
+  const skip = (page - 1) * limit;
+
+  const [total, cars] = await Promise.all([
+    prisma.car.count(),
+    prisma.car.findMany({
+      include: {
+        images: {
+          orderBy: { order: "asc" },
+          take: 1,
+        },
+      },
+      orderBy: { id: "desc" },
+      skip,
+      take: limit,
+    }),
+  ]);
+
+  const carsWithThumbnails = cars.map((car) => {
+    const firstImage = car.images[0];
+    if (!firstImage) return car;
+
+    return {
+      ...car,
+      images: [{ ...firstImage, url: toThumbnailUrl(firstImage.url) }],
+    };
   });
-  res.json(cars);
+
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+
+  res.json({
+    page,
+    limit,
+    total,
+    totalPages,
+    cars: carsWithThumbnails,
+  });
 });
 
 r.post("/import", auth("ADMIN"), async (req: Request, res: Response) => {

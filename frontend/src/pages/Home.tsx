@@ -18,6 +18,43 @@ type SortOption = "endingAsc" | "endingDesc" | "newest";
 
 type MessageKey = string | null;
 
+type CarsListResponse = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  cars: Car[];
+};
+
+const CARS_REQUEST_TIMEOUT_MS = 10_000;
+const CACHED_CARS_KEY = "autoszczech.cachedCars";
+
+const readCachedCars = (): Car[] => {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const raw = window.localStorage.getItem(CACHED_CARS_KEY);
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as Car[]) : [];
+  } catch {
+    return [];
+  }
+};
+
+const persistCachedCars = (cars: Car[]) => {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(CACHED_CARS_KEY, JSON.stringify(cars));
+  } catch {
+    // ignore storage issues
+  }
+};
+
+const cachedCars = readCachedCars();
+
 const parseSortOption = (value: string | null): SortOption => {
   if (value === "endingAsc" || value === "endingDesc" || value === "newest") {
     return value;
@@ -79,10 +116,19 @@ export default function Home() {
     (async () => {
       try {
         const apiUrl = await getApiUrl();
-        const response = await axios.get<Car[]>(`${apiUrl}/api/cars`, { timeout: CARS_REQUEST_TIMEOUT_MS });
+        const response = await axios.get<CarsListResponse>(`${apiUrl}/api/cars`, {
+          timeout: CARS_REQUEST_TIMEOUT_MS,
+          params: {
+            page: 1,
+            limit: 24,
+          },
+        });
+
+        const fetchedCars = Array.isArray(response.data?.cars) ? response.data.cars : [];
+
         if (!cancelled) {
-          replaceBaseCars(response.data, "api");
-          persistCachedCars(response.data);
+          replaceBaseCars(fetchedCars, "api");
+          persistCachedCars(fetchedCars);
           setErrorKey(null);
           setStatusMessageKey(null);
           setUsingSampleData(false);
