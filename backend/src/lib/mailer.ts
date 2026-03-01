@@ -1,6 +1,6 @@
 import net from "node:net";
 import tls from "node:tls";
-import { once } from "node:events";
+
 
 const webhookUrl = process.env.EMAIL_WEBHOOK_URL || process.env.MAIL_WEBHOOK_URL;
 const frontendBaseUrl =
@@ -17,36 +17,9 @@ const smtpConfig = {
   from: process.env.SMTP_FROM || process.env.SMTP_USER,
 };
 
-const extractEmailAddress = (value?: string) => {
-  if (!value) return "";
-  const trimmed = value.trim();
-  const angleMatch = trimmed.match(/<([^>]+)>/);
-  const candidate = angleMatch?.[1]?.trim() || trimmed;
-  return candidate.toLowerCase();
-};
-
-const buildFallbackEnvelopeFrom = () => {
-  const hostCandidate = smtpConfig.host?.trim().toLowerCase() || "localhost";
-  const host = hostCandidate.replace(/^smtp\./, "") || "localhost";
-  return `mailer@${host}`;
-};
-
-const smtpEnvelopeFromDefault =
-  extractEmailAddress(smtpConfig.user) ||
-  extractEmailAddress(smtpConfig.from) ||
-  buildFallbackEnvelopeFrom();
-
-const smtpHeaderFrom = smtpConfig.user || smtpConfig.from || smtpEnvelopeFromDefault;
-
-if (smtpConfig.from && smtpConfig.user && extractEmailAddress(smtpConfig.from) !== extractEmailAddress(smtpConfig.user)) {
-  console.warn(
-    `[mailer] SMTP_FROM (${smtpConfig.from}) differs from SMTP_USER (${smtpConfig.user}). Using SMTP_USER as header/envelope FROM for deliverability.`
-  );
-}
-
 const officeEmailRecipient = process.env.OFFICE_BID_EMAIL?.trim() || "biuro@autoszczech.ch";
 
-export const emailDeliveryConfigured = Boolean(webhookUrl || (smtpConfig.host && smtpConfig.port && smtpEnvelopeFromDefault));
+export const emailDeliveryConfigured = Boolean(webhookUrl || (smtpConfig.host && smtpConfig.port && smtpConfig.from));
 
 type MailPayload = {
   kind: "registration_pending" | "account_approved" | "auction_won" | "auction_awarded" | "bid_placed_client" | "bid_placed_office";
@@ -59,18 +32,6 @@ type MailPayload = {
 type Recipient = {
   to: string;
   firstName?: string | null;
-};
-
-const isNetworkError = (error: unknown) => {
-  if (!error || typeof error !== "object") return false;
-  const code = "code" in error ? String((error as { code?: unknown }).code ?? "") : "";
-  return ["ECONNRESET", "ETIMEDOUT", "EPIPE", "ECONNABORTED", "ECONNREFUSED"].includes(code);
-};
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-type SendMailOptions = {
-  retries?: number;
 };
 
 const sanitizeName = (firstName?: string | null) => {
@@ -93,19 +54,7 @@ const formatAmount = (amount?: number | null) => {
 };
 
 const readResponse = async (socket: net.Socket | tls.TLSSocket, expectedCode: number) => {
-  const timeoutMs = 15000;
-
-  const data = await Promise.race<Buffer>([
-    once(socket, "data").then(([chunk]) => chunk as Buffer),
-    once(socket, "error").then(([error]) => Promise.reject(error)),
-    new Promise<Buffer>((_resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error("SMTP socket timeout while waiting for response"));
-      }, timeoutMs);
-      timeout.unref?.();
-    }),
-  ]);
-
+  const [data] = (await once(socket, "data")) as [Buffer];
   const message = data.toString().trim();
 
   if (!message.startsWith(String(expectedCode))) {
@@ -132,32 +81,20 @@ const sendViaWebhook = async (payload: MailPayload) => {
 };
 
 const sendViaSmtp = async (payload: MailPayload) => {
-  const { host, port, secure, user, pass } = smtpConfig;
-  const smtpEnvelopeFrom =
-    (smtpConfig.user?.trim() ||
-      smtpConfig.from?.toString().match(/<([^>]+)>/)?.[1] ||
-      "").trim() ||
-    `mailer@${host}`;
-
-  if (!host || !port || !smtpEnvelopeFrom) return false;
+  const { host, port, secure, user, pass, from } = smtpConfig;
+  if (!host || !port || !from) return false;
 
   const socket = secure
     ? tls.connect({ host, port, timeout: 15000 })
     : net.createConnection({ host, port, timeout: 15000 });
 
-  let dataAccepted = false; // set true only after final 250 after DATA
-
-  const waitForClose = new Promise<void>((resolve) => {
-    socket.once("close", () => {
-      console.info("[mailer] smtp connection closed");
-      resolve();
-    });
-  });
-
   socket.setTimeout(15000);
   socket.setKeepAlive(false);
   socket.on("error", (error) => {
     console.error("[mailer] SMTP transport error", error);
+  });
+  socket.once("close", () => {
+    console.info("[mailer] smtp connection closed");
   });
 
   try {
@@ -220,7 +157,7 @@ const sendViaSmtp = async (payload: MailPayload) => {
 
     const message = [
       `Subject: ${payload.subject}`,
-      `From: ${smtpHeaderFrom}`,
+      `From: ${from}`,
       `To: ${payload.to}`,
       "MIME-Version: 1.0",
       "Content-Type: text/plain; charset=utf-8",
@@ -244,45 +181,29 @@ const sendViaSmtp = async (payload: MailPayload) => {
   } finally {
     if (!socket.destroyed) {
       socket.end();
-      socket.destroy();
     }
-
-    await Promise.race([waitForClose, sleep(1000)]);
   }
 
   return true;
 };
 
-const sendMail = async (payload: MailPayload, options: SendMailOptions = {}) => {
+const sendMail = async (payload: MailPayload) => {
   if (!payload.to) return false;
 
-  const maxAttempts = Math.max(1, (options.retries ?? 0) + 1);
+  try {
+    const delivered = webhookUrl ? await sendViaWebhook(payload) : await sendViaSmtp(payload);
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    try {
-      const delivered = webhookUrl ? await sendViaWebhook(payload) : await sendViaSmtp(payload);
-
-      if (delivered) {
-        console.info(`[mailer] Sent \"${payload.kind}\" email to ${payload.to}`);
-        return true;
-      }
-
-      console.info(`[mailer] Email delivery is not configured, skipped \"${payload.kind}\" for ${payload.to}`);
-      return false;
-    } catch (error) {
-      const canRetry = attempt < maxAttempts && isNetworkError(error);
-      if (!canRetry) {
-        console.error(`[mailer] Failed to send \"${payload.kind}\" email to ${payload.to}`, error);
-        return false;
-      }
-
-      const backoffMs = 500 + Math.floor(Math.random() * 501);
-      console.warn(`[mailer] Retry ${attempt}/${maxAttempts - 1} for \"${payload.kind}\" in ${backoffMs}ms`);
-      await sleep(backoffMs);
+    if (delivered) {
+      console.info(`[mailer] Sent \"${payload.kind}\" email to ${payload.to}`);
+      return true;
     }
-  }
 
-  return false;
+    console.info(`[mailer] Email delivery is not configured, skipped \"${payload.kind}\" for ${payload.to}`);
+    return false;
+  } catch (error) {
+    console.error(`[mailer] Failed to send \"${payload.kind}\" email to ${payload.to}`, error);
+    return false;
+  }
 };
 
 export const sendRegistrationPendingEmail = async ({ to, firstName }: Recipient) => {
@@ -423,7 +344,7 @@ export const sendBidPlacedEmails = async ({
   const lastName = typeof userLastName === "string" ? userLastName.trim() : "";
   const fullName = `${firstName} ${lastName}`.trim();
 
-  const clientSent = await sendMail({
+  const clientMailPromise = sendMail({
     kind: "bid_placed_client",
     to: userEmail,
     subject: `Potwierdzenie złożenia oferty – ${carName}`,
@@ -445,9 +366,9 @@ export const sendBidPlacedEmails = async ({
       "Zespół AutoSzczech",
     ].join("\n"),
     meta: { auctionUrl, amount: formattedAmount, date },
-  }, { retries: 2 });
+  });
 
-  const officeSent = await sendMail({
+  const officeMailPromise = sendMail({
     kind: "bid_placed_office",
     to: officeEmailRecipient,
     subject: `Potwierdzenie złożenia oferty – ${carName}`,
@@ -465,5 +386,6 @@ export const sendBidPlacedEmails = async ({
     meta: { auctionUrl, amount: formattedAmount, date, userEmail, fullName },
   });
 
+  const [clientSent, officeSent] = await Promise.all([clientMailPromise, officeMailPromise]);
   return { clientSent, officeSent };
 };
