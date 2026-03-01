@@ -79,9 +79,10 @@ export default function Home() {
     (async () => {
       try {
         const apiUrl = await getApiUrl();
-        const response = await axios.get<Car[]>(`${apiUrl}/api/cars`);
+        const response = await axios.get<Car[]>(`${apiUrl}/api/cars`, { timeout: CARS_REQUEST_TIMEOUT_MS });
         if (!cancelled) {
           replaceBaseCars(response.data, "api");
+          persistCachedCars(response.data);
           setErrorKey(null);
           setStatusMessageKey(null);
           setUsingSampleData(false);
@@ -89,13 +90,18 @@ export default function Home() {
       } catch (error) {
         if (!cancelled) {
           const hasImported = cars.some((car) => (car.source ?? "").toLowerCase() === "imported");
-          const fallbackAvailable = sampleCars.length > 0 || cars.length > 0;
-          if (cars.length === 0 && sampleCars.length > 0) {
+          const hasCached = cachedCars.length > 0;
+          const fallbackAvailable = sampleCars.length > 0 || cars.length > 0 || hasCached;
+
+          if (cars.length === 0 && hasCached) {
+            replaceBaseCars(cachedCars, "api");
+          } else if (cars.length === 0 && sampleCars.length > 0) {
             replaceBaseCars(sampleCars, "sample");
           }
+
           setErrorKey(fallbackAvailable ? null : "home.listings.error");
-          setStatusMessageKey(hasImported ? null : "home.listings.demoMode");
-          setUsingSampleData(!hasImported);
+          setStatusMessageKey(hasImported || hasCached ? null : "home.listings.demoMode");
+          setUsingSampleData(!hasImported && !hasCached);
         }
       } finally {
         if (!cancelled) setLoading(false);
