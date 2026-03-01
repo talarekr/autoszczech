@@ -6,9 +6,11 @@
     "#shared/*": "./dist/shared/*"
   },
   "scripts": {
+    "postinstall": "prisma generate",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "prisma generate && tsc",
     "start": "node dist/backend/src/start.js",
+    "start:prod": "npm run prisma:migrate && node dist/backend/src/start.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "prisma:seed": "node prisma/seed.mjs"

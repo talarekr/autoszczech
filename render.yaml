@@ -7,7 +7,7 @@ services:
       npm install &&
       npm run build --prefix backend &&
       npm run prisma:migrate --prefix backend
-    startCommand: cd backend && node dist/backend/src/start.js
+    startCommand: npm run start:prod --prefix backend
     envVars:
       - key: DATABASE_URL
         fromDatabase:

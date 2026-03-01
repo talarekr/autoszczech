@@ -7,6 +7,7 @@ import { RegistrationStatus } from "@prisma/client";
 import { JWT_SECRET } from "../lib/jwt.js";
 import { auth, AuthReq } from "../middleware/auth.js";
 import { isAllowedAdminEmail } from "../lib/adminAccess.js";
+import { sendRegistrationPendingEmail } from "../lib/mailer.js";
 
 const r = Router();
 
@@ -30,6 +31,12 @@ r.post("/register", async (req: Request, res: Response) => {
       registrationForm: Object.keys(rest).length > 0 ? rest : null,
     },
   });
+
+  void sendRegistrationPendingEmail({
+    to: user.email,
+    firstName: user.firstName,
+  });
+
   res.json({ id: user.id, email: user.email, status: user.registrationStatus });
 });
 
