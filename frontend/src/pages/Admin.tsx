@@ -45,6 +45,9 @@ export default function Admin() {
   const [pendingUsers, setPendingUsers] = useState<AdminUser[]>([]);
   const [searchedUsers, setSearchedUsers] = useState<AdminUser[]>([]);
   const [clientSearch, setClientSearch] = useState("");
+  const [showAllClients, setShowAllClients] = useState(false);
+  const [clientsDateFrom, setClientsDateFrom] = useState("");
+  const [clientsDateTo, setClientsDateTo] = useState("");
   const [clientsLoading, setClientsLoading] = useState(false);
   const [clientsError, setClientsError] = useState<string | null>(null);
   const [approvingUserId, setApprovingUserId] = useState<number | null>(null);
@@ -244,14 +247,16 @@ export default function Admin() {
     } as const;
   };
 
-  const searchClients = async (term?: string) => {
+  const searchClients = async (options?: { term?: string; forceAll?: boolean }) => {
     if (!token || !isAdmin) {
       setClientsError(t("admin.clients.authRequired"));
       return;
     }
 
-    const query = (term ?? clientSearch).trim();
-    if (!query) {
+    const query = (options?.term ?? clientSearch).trim();
+    const shouldShowAll = options?.forceAll ?? showAllClients;
+
+    if (!query && !shouldShowAll && !clientsDateFrom && !clientsDateTo) {
       setSearchedUsers([]);
       return;
     }
@@ -262,7 +267,11 @@ export default function Admin() {
     try {
       const apiUrl = await getApiUrl();
       const response = await axios.get<{ users: AdminUser[] }>(`${apiUrl}/api/admin/users`, {
-        params: { search: query },
+        params: {
+          ...(query ? { search: query } : {}),
+          ...(clientsDateFrom ? { dateFrom: clientsDateFrom } : {}),
+          ...(clientsDateTo ? { dateTo: clientsDateTo } : {}),
+        },
         headers: { Authorization: `Bearer ${token}` },
       });
       setSearchedUsers(response.data.users ?? []);
@@ -273,6 +282,38 @@ export default function Admin() {
     } finally {
       setClientsLoading(false);
     }
+  };
+
+  const handleShowAllClients = () => {
+    setShowAllClients(true);
+    searchClients({ forceAll: true });
+  };
+
+  const handleSearchClients = () => {
+    setShowAllClients(false);
+    searchClients();
+  };
+
+  const handleDateFilter = () => {
+    setShowAllClients(true);
+    searchClients({ forceAll: true });
+  };
+
+  const handleClearDateFilter = () => {
+    setClientsDateFrom("");
+    setClientsDateTo("");
+
+    if (showAllClients) {
+      searchClients({ forceAll: true });
+      return;
+    }
+
+    if (clientSearch.trim()) {
+      searchClients();
+      return;
+    }
+
+    setSearchedUsers([]);
   };
 
   useEffect(() => {
@@ -676,27 +717,72 @@ export default function Admin() {
                   </p>
                   <h3 className="text-lg font-semibold text-neutral-900">{t("admin.clients.searchTitle")}</h3>
                   <p className="text-sm text-neutral-600">{t("admin.clients.searchDescription")}</p>
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <input
-                      type="search"
-                      value={clientSearch}
-                      onChange={(event) => setClientSearch(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          searchClients();
-                        }
-                      }}
-                      placeholder={t("admin.clients.searchPlaceholder") ?? undefined}
-                      className="w-full rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-800 shadow-inner focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => searchClients()}
-                      className="shrink-0 rounded-full bg-neutral-900 px-5 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-white shadow-sm transition hover:bg-neutral-800"
-                    >
-                      {t("admin.clients.searchCta")}
-                    </button>
+                  <div className="space-y-3">
+                    <div className="flex flex-col gap-2 sm:grid sm:grid-cols-[1fr_auto_auto] sm:items-center">
+                      <input
+                        type="search"
+                        value={clientSearch}
+                        onChange={(event) => setClientSearch(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            handleSearchClients();
+                          }
+                        }}
+                        placeholder={t("admin.clients.searchPlaceholder") ?? undefined}
+                        className="w-full rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-800 shadow-inner focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSearchClients}
+                        className="shrink-0 rounded-full bg-neutral-900 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-white shadow-sm transition hover:bg-neutral-800"
+                      >
+                        {t("admin.clients.searchCta")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleShowAllClients}
+                        className="shrink-0 rounded-full bg-red-600 px-3 py-1.5 text-[11px] font-semibold whitespace-nowrap text-white shadow-sm transition hover:bg-red-700"
+                      >
+                        {t("admin.clients.showAllCta")}
+                      </button>
+                    </div>
+
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto_auto] sm:items-end">
+                      <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">
+                        <span>{t("admin.clients.dateFrom")}</span>
+                        <input
+                          type="date"
+                          value={clientsDateFrom}
+                          onChange={(event) => setClientsDateFrom(event.target.value)}
+                          className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm font-normal normal-case tracking-normal text-neutral-800 shadow-inner focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">
+                        <span>{t("admin.clients.dateTo")}</span>
+                        <input
+                          type="date"
+                          value={clientsDateTo}
+                          min={clientsDateFrom || undefined}
+                          onChange={(event) => setClientsDateTo(event.target.value)}
+                          className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm font-normal normal-case tracking-normal text-neutral-800 shadow-inner focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleDateFilter}
+                        className="w-full rounded-full bg-neutral-900 px-3 py-1.5 text-[11px] font-semibold whitespace-nowrap text-white shadow-sm transition hover:bg-neutral-800 lg:w-auto"
+                      >
+                        {t("admin.clients.filterDateCta")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleClearDateFilter}
+                        className="w-full rounded-full border border-neutral-300 bg-white px-3 py-1.5 text-[11px] font-semibold whitespace-nowrap text-neutral-700 shadow-sm transition hover:bg-neutral-100 lg:w-auto"
+                      >
+                        {t("admin.clients.clearDateCta")}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -710,6 +796,9 @@ export default function Admin() {
                   </div>
                 ) : (
                   <div className="space-y-3">
+                    <p className="text-sm text-neutral-600">
+                      {t("admin.clients.registeredCount", { count: searchedUsers.length })}
+                    </p>
                     {searchedUsers.map((user) => (
                       <div
                         key={user.id}

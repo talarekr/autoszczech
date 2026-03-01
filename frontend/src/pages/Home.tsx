@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { useTranslation } from "react-i18next";
 
@@ -17,6 +18,47 @@ type SortOption = "endingAsc" | "endingDesc" | "newest";
 
 type MessageKey = string | null;
 
+const parseSortOption = (value: string | null): SortOption => {
+  if (value === "endingAsc" || value === "endingDesc" || value === "newest") {
+    return value;
+  }
+  return "endingAsc";
+};
+
+const parseProviderOption = (value: string | null): InsuranceProviderKey | "" => {
+  if (!value) return "";
+  return orderedInsuranceProviders.includes(value as InsuranceProviderKey)
+    ? (value as InsuranceProviderKey)
+    : "";
+};
+
+
+const CACHED_CARS_KEY = "autoszczech.cachedCars.v1";
+const CARS_REQUEST_TIMEOUT_MS = 1500;
+
+const loadCachedCars = (): Car[] => {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const raw = window.localStorage.getItem(CACHED_CARS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as Car[]) : [];
+  } catch {
+    return [];
+  }
+};
+
+const persistCachedCars = (carsToCache: Car[]) => {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(CACHED_CARS_KEY, JSON.stringify(carsToCache));
+  } catch {
+    // ignore storage errors
+  }
+};
+
 const isAuctionActive = (car: Car) => {
   if (!car.auctionEnd) return true;
   const end = new Date(car.auctionEnd).getTime();
@@ -25,23 +67,44 @@ const isAuctionActive = (car: Car) => {
 
 export default function Home() {
   const { cars, replaceBaseCars } = useInventory();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState<boolean>(false);
   const [errorKey, setErrorKey] = useState<MessageKey>(null);
   const [statusMessageKey, setStatusMessageKey] = useState<MessageKey>(null);
   const [usingSampleData, setUsingSampleData] = useState<boolean>(
     () => cars.length === 0 || cars.every((car) => (car.source ?? "").toLowerCase() === "sample")
   );
-  const [searchTerm, setSearchTerm] = useState("");
-  const [yearFrom, setYearFrom] = useState("");
-  const [yearTo, setYearTo] = useState("");
-  const [sort, setSort] = useState<SortOption>("endingAsc");
-  const [provider, setProvider] = useState<InsuranceProviderKey | "">("");
+  const [cachedCars] = useState<Car[]>(() => loadCachedCars());
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get("q") ?? "");
+  const [yearFrom, setYearFrom] = useState(() => searchParams.get("yearFrom") ?? "");
+  const [yearTo, setYearTo] = useState(() => searchParams.get("yearTo") ?? "");
+  const [sort, setSort] = useState<SortOption>(() => parseSortOption(searchParams.get("sort")));
+  const [provider, setProvider] = useState<InsuranceProviderKey | "">(() => parseProviderOption(searchParams.get("provider")));
   const { t } = useTranslation();
 
   const providerOptions = useMemo(
     () => orderedInsuranceProviders.map((key) => ({ key, label: t(`home.search.providers.${key}`) })),
     [t]
   );
+
+  useEffect(() => {
+    if (cars.length > 0 || cachedCars.length === 0) return;
+
+    replaceBaseCars(cachedCars, "api");
+    setUsingSampleData(false);
+  }, [cachedCars, cars.length, replaceBaseCars]);
+
+  useEffect(() => {
+    const next = new URLSearchParams();
+
+    if (searchTerm.trim()) next.set("q", searchTerm.trim());
+    if (yearFrom.trim()) next.set("yearFrom", yearFrom.trim());
+    if (yearTo.trim()) next.set("yearTo", yearTo.trim());
+    if (sort !== "endingAsc") next.set("sort", sort);
+    if (provider) next.set("provider", provider);
+
+    setSearchParams(next, { replace: true });
+  }, [provider, searchTerm, setSearchParams, sort, yearFrom, yearTo]);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,9 +114,10 @@ export default function Home() {
     (async () => {
       try {
         const apiUrl = await getApiUrl();
-        const response = await axios.get<Car[]>(`${apiUrl}/api/cars`);
+        const response = await axios.get<Car[]>(`${apiUrl}/api/cars`, { timeout: CARS_REQUEST_TIMEOUT_MS });
         if (!cancelled) {
           replaceBaseCars(response.data, "api");
+          persistCachedCars(response.data);
           setErrorKey(null);
           setStatusMessageKey(null);
           setUsingSampleData(false);
@@ -61,13 +125,18 @@ export default function Home() {
       } catch (error) {
         if (!cancelled) {
           const hasImported = cars.some((car) => (car.source ?? "").toLowerCase() === "imported");
-          const fallbackAvailable = sampleCars.length > 0 || cars.length > 0;
-          if (cars.length === 0 && sampleCars.length > 0) {
+          const hasCached = cachedCars.length > 0;
+          const fallbackAvailable = sampleCars.length > 0 || cars.length > 0 || hasCached;
+
+          if (cars.length === 0 && hasCached) {
+            replaceBaseCars(cachedCars, "api");
+          } else if (cars.length === 0 && sampleCars.length > 0) {
             replaceBaseCars(sampleCars, "sample");
           }
+
           setErrorKey(fallbackAvailable ? null : "home.listings.error");
-          setStatusMessageKey(hasImported ? null : "home.listings.demoMode");
-          setUsingSampleData(!hasImported);
+          setStatusMessageKey(hasImported || hasCached ? null : "home.listings.demoMode");
+          setUsingSampleData(!hasImported && !hasCached);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -220,8 +289,8 @@ export default function Home() {
                 type="button"
                 onClick={() => {
                   setSearchTerm("");
-                  setYearFrom("2008");
-                  setYearTo("2024");
+                  setYearFrom("");
+                  setYearTo("");
                   setSort("endingAsc");
                   setProvider("");
                 }}
