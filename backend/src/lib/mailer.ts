@@ -85,11 +85,50 @@ const sendViaSmtp = async (payload: MailPayload) => {
   const { host, port, secure, user, pass, from } = smtpConfig;
   if (!host || !port || !from) return false;
 
-  const socket = secure ? tls.connect({ host, port }) : net.createConnection({ host, port });
+  const socket = secure
+    ? tls.connect({ host, port, timeout: 15000 })
+    : net.createConnection({ host, port, timeout: 15000 });
+
   socket.setTimeout(15000);
+  socket.setKeepAlive(false);
+  socket.on("error", (error) => {
+    console.error("[mailer] SMTP transport error", error);
+  });
+  socket.once("close", () => {
+    console.info("[mailer] smtp connection closed");
+  });
 
   try {
-    await once(socket, secure ? "secureConnect" : "connect");
+    await new Promise<void>((resolve, reject) => {
+      const connectEvent = secure ? "secureConnect" : "connect";
+
+      const cleanup = () => {
+        socket.off(connectEvent, onConnect);
+        socket.off("error", onError);
+        socket.off("timeout", onTimeout);
+      };
+
+      const onConnect = () => {
+        cleanup();
+        resolve();
+      };
+
+      const onError = (error: Error) => {
+        cleanup();
+        reject(error);
+      };
+
+      const onTimeout = () => {
+        cleanup();
+        reject(new Error("SMTP connection timeout"));
+      };
+
+      socket.once(connectEvent, onConnect);
+      socket.once("error", onError);
+      socket.once("timeout", onTimeout);
+    });
+
+    console.info("[mailer] smtp connection opened");
     await readResponse(socket, 220);
 
     socket.write(`EHLO ${host}\r\n`);
@@ -132,7 +171,9 @@ const sendViaSmtp = async (payload: MailPayload) => {
 
     socket.write("QUIT\r\n");
   } finally {
-    socket.end();
+    if (!socket.destroyed) {
+      socket.end();
+    }
   }
 
   return true;
