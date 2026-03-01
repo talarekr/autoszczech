@@ -1,6 +1,5 @@
 import net from "node:net";
 import tls from "node:tls";
-import { once } from "node:events";
 
 
 const webhookUrl = process.env.EMAIL_WEBHOOK_URL || process.env.MAIL_WEBHOOK_URL;
@@ -145,11 +144,13 @@ const sendViaSmtp = async (payload: MailPayload) => {
       await readResponse(socket, 235);
     }
 
-    socket.write(`MAIL FROM:<${from}>\r\n`);
-    await readResponse(socket, 250);
+    socket.write(`MAIL FROM:<${smtpEnvelopeFrom}>\r\n`);
+    const mailFromResponse = await readResponse(socket, 250);
+    console.info(`[mailer] MAIL FROM accepted ${mailFromResponse}`);
 
     socket.write(`RCPT TO:<${payload.to}>\r\n`);
-    await readResponse(socket, 250);
+    const rcptResponse = await readResponse(socket, 250);
+    console.info(`[mailer] RCPT TO accepted ${payload.to} ${rcptResponse}`);
 
     socket.write("DATA\r\n");
     await readResponse(socket, 354);
@@ -167,9 +168,16 @@ const sendViaSmtp = async (payload: MailPayload) => {
     ].join("\r\n");
 
     socket.write(message + "\r\n");
-    await readResponse(socket, 250);
+    const dataResponse = await readResponse(socket, 250);
+    dataAccepted = true;
+    console.info(`[mailer] DATA accepted (250) ${dataResponse}`);
 
     socket.write("QUIT\r\n");
+  } catch (error) {
+    if (!dataAccepted) {
+      console.error("[mailer] send failed before 250", error);
+    }
+    throw error;
   } finally {
     if (!socket.destroyed) {
       socket.end();
