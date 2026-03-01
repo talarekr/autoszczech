@@ -17,6 +17,12 @@
 - Importuj folder `frontend/`
 - Ustaw Environment Variable: `VITE_API_URL` = URL backendu (np. `https://autoszczech-backend.onrender.com` albo inny host); ewentualne końcówki `/api` są automatycznie usuwane, a jeśli zmienna nie jest ustawiona, frontend sam przetestuje dostępne adresy i wybierze działający backend.
 
+## E-mail (SMTP) — dostarczalność do Gmail/Outlook
+- Dla wysyłki na zewnętrzne skrzynki (`gmail.com`, `outlook.com` itd.) kluczowe jest, aby `SMTP_FROM` był zgodny z kontem SMTP (`SMTP_USER`) i domeną nadawcy.
+- Zalecenie dla tej aplikacji: ustaw `SMTP_USER=biuro@autoszczech.ch` oraz `SMTP_FROM=biuro@autoszczech.ch`.
+- Upewnij się, że dla domeny nadawcy są poprawnie skonfigurowane rekordy **SPF**, **DKIM** i **DMARC** (w panelu LH.pl są dostępne opcje konfiguracji DKIM/DMARC).
+- Bez poprawnego SPF/DKIM/DMARC serwery odbiorców mogą odrzucać lub cicho filtrować wiadomości mimo przyjęcia przez serwer SMTP.
+
 ## 4) Automatyczny import JSON + zdjęć z zewnętrznego FTP
 - Watcher działa domyślnie (`FTP_IMPORT_ENABLED=true`) i co 30 minut sprawdza katalog `uploads/json` na serwerze `hosting2580517.online.pro` (login `hosting2580517`, hasło `autoszczech12!!`).
 - Do działania wymagany jest `curl` (Render/Linux mają go preinstalowanego). Każdy plik `.json` jest pobierany, analizowany i – jeżeli suma kontrolna SHA-256 zmieniła się – importowany jako nowa lub zaktualizowana aukcja.
