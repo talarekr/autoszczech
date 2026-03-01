@@ -121,7 +121,6 @@ export default function Home() {
           params: {
             page: 1,
             limit: 24,
-            status: "active",
           },
         });
 
