@@ -97,12 +97,25 @@ export default function CarDetails() {
     setOfferFeedback(null);
 
     const numericId = Number(id);
+    const fallbackCandidate = findCarByIdentifier(id) ?? (Number.isFinite(numericId) ? findCarByIdentifier(numericId) : undefined);
+
+    if (fallbackCandidate) {
+      const fallbackImages = normalizeImageUrls(fallbackCandidate.images);
+
+      if (allowArchived || isAuctionActive(fallbackCandidate.auctionEnd)) {
+        setCar({ ...fallbackCandidate, images: fallbackImages });
+        setActiveImage(fallbackImages[0]?.url ?? null);
+        setStatusMessageKey(fallbackCandidate.source === "api" ? null : "carDetails.demoMode");
+        setErrorKey(null);
+        setLoading(false);
+      }
+    }
 
     (async () => {
       let apiUrl: string | null = null;
       try {
         apiUrl = await getApiUrl();
-        const response = await axios.get<Car>(`${apiUrl}/api/cars/${id}`);
+        const response = await axios.get<Car>(`${apiUrl}/api/cars/${id}`, { timeout: 1000 });
         if (cancelled) return;
         const images = normalizeImageUrls(response.data.images, apiUrl);
         const nextCar = { ...response.data, images };
@@ -118,37 +131,22 @@ export default function CarDetails() {
         setStatusMessageKey(null);
       } catch (error) {
         if (cancelled) return;
-        const fallbackCar = id ? findCarByIdentifier(id) : undefined;
-        if (fallbackCar) {
-          const images = normalizeImageUrls(fallbackCar.images, apiUrl ?? undefined);
-          if (allowArchived || isAuctionActive(fallbackCar.auctionEnd)) {
-            setCar({ ...fallbackCar, images });
+        if (fallbackCandidate) {
+          const images = normalizeImageUrls(fallbackCandidate.images, apiUrl ?? undefined);
+          if (allowArchived || isAuctionActive(fallbackCandidate.auctionEnd)) {
+            setCar({ ...fallbackCandidate, images });
             setActiveImage(images[0]?.url ?? null);
-            setStatusMessageKey(fallbackCar.source === "api" ? null : "carDetails.demoMode");
+            setStatusMessageKey(fallbackCandidate.source === "api" ? null : "carDetails.demoMode");
             setErrorKey(null);
-          } else {
-            setCar(null);
-            setActiveImage(null);
-            setErrorKey("carDetails.notFound");
-          }
-        } else if (Number.isFinite(numericId)) {
-          const fallbackNumeric = findCarByIdentifier(numericId);
-          if (fallbackNumeric) {
-            const images = normalizeImageUrls(fallbackNumeric.images, apiUrl ?? undefined);
-            if (allowArchived || isAuctionActive(fallbackNumeric.auctionEnd)) {
-              setCar({ ...fallbackNumeric, images });
-              setActiveImage(images[0]?.url ?? null);
-              setStatusMessageKey(fallbackNumeric.source === "api" ? null : "carDetails.demoMode");
-              setErrorKey(null);
-              return;
-            }
-            setErrorKey("carDetails.notFound");
             return;
           }
-          setErrorKey("carDetails.fetchError");
-        } else {
-          setErrorKey("carDetails.fetchError");
+          setCar(null);
+          setActiveImage(null);
+          setErrorKey("carDetails.notFound");
+          return;
         }
+
+        setErrorKey("carDetails.fetchError");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -157,7 +155,7 @@ export default function CarDetails() {
     return () => {
       cancelled = true;
     };
-  }, [allowArchived, id]);
+  }, [allowArchived, id, findCarByIdentifier]);
 
   const countdown = useCountdown(car?.auctionEnd ?? undefined);
   useEffect(() => {
