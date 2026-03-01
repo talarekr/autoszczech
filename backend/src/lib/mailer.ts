@@ -1,5 +1,6 @@
 import net from "node:net";
 import tls from "node:tls";
+import { once } from "node:events";
 
 
 const webhookUrl = process.env.EMAIL_WEBHOOK_URL || process.env.MAIL_WEBHOOK_URL;
@@ -83,6 +84,8 @@ const sendViaWebhook = async (payload: MailPayload) => {
 const sendViaSmtp = async (payload: MailPayload) => {
   const { host, port, secure, user, pass, from } = smtpConfig;
   if (!host || !port || !from) return false;
+  const smtpEnvelopeFrom = user?.trim() || from.trim() || "mailer@autoszczech.ch";
+  let dataAccepted = false;
 
   const socket = secure
     ? tls.connect({ host, port, timeout: 15000 })
