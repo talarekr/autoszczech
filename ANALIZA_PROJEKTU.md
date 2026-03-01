@@ -1,84 +1,91 @@
 # Analiza projektu AutoSzczech
 
-## 1. Charakter repozytorium
+## 1) Charakter repozytorium
 
-Repozytorium `autoszczech` to monorepo JavaScript/TypeScript zarządzane przez **npm workspaces** z dwoma głównymi aplikacjami:
+Repozytorium `autoszczech` jest monorepo zarządzanym przez **npm workspaces** (`package.json` w katalogu głównym), z podziałem na trzy główne obszary:
 
-- `backend/` — API (Node.js + Express + Prisma + PostgreSQL),
-- `frontend/` — aplikacja webowa (React + Vite + Tailwind + i18next),
-- `shared/` — kod współdzielony pomiędzy pakietami (np. importer danych).
+- `backend/` — API HTTP (Node.js + Express + Prisma + PostgreSQL),
+- `frontend/` — aplikacja kliencka (React + Vite + Tailwind + i18next),
+- `shared/` — współdzielony kod domenowy (np. importer danych).
 
-W katalogu głównym znajdują się również pliki infrastrukturalne i operacyjne (`render.yaml`, `.env.example`, `scripts/*`).
+Dodatkowo projekt zawiera pliki i skrypty operacyjne (`render.yaml`, `scripts/*`, dokumentację wdrożeniową).
 
-## 2. Struktura katalogów
-
-Najważniejsze katalogi projektu:
-
-- `backend/`
-  - `src/index.ts` — główny punkt wejścia API (middleware, trasy, uruchomienie serwera),
-  - `src/routes/` — endpointy (`auth`, `cars`, `offers`, `favorites`, `admin`, import),
-  - `src/jobs/ftpWatcher.ts` — harmonogram importu FTP,
-  - `src/lib/` — logika pomocnicza (konfiguracja FTP, Prisma, uprawnienia admina),
-  - `prisma/schema.prisma` — model danych i indeksy,
-  - `prisma/migrations/` — migracje bazy.
-- `frontend/`
-  - `src/main.tsx`, `src/App.tsx` — bootstrap i root aplikacji,
-  - `src/pages/` — widoki użytkownika i panelu admin,
-  - `src/components/` — komponenty UI,
-  - `src/contexts/` — konteksty aplikacyjne,
-  - `src/lib/api.ts` — wykrywanie i wybór URL API,
-  - `public/` oraz `sample-imports/` — zasoby statyczne i przykładowe importy.
-- `shared/importers/insurance.ts` — współdzielone narzędzia importu.
-- `scripts/` — skrypty operacyjne (archiwa, reset zdalnej gałęzi).
-
-## 3. Konfiguracja i uruchamianie
+## 2) Struktura katalogów i odpowiedzialności
 
 ### Root
 
-`package.json` w katalogu głównym definiuje workspaces:
+- `README.md` — instrukcja uruchomienia, wdrożenia (Render/Vercel), importu FTP i operacji administracyjnych,
+- `render.yaml` — blueprint infrastruktury Render (backend + PostgreSQL + persistent disk),
+- `.env.example` — przykładowe zmienne środowiskowe backendu i frontendu,
+- `scripts/` — skrypty pomocnicze (tworzenie archiwów, reset zdalnej gałęzi).
 
-- `backend`
-- `frontend`
+### Backend (`backend/`)
+
+- `src/index.ts` + `src/start.ts` — bootstrap aplikacji i serwera,
+- `src/routes/` — endpointy (`auth`, `cars`, `offers`, `favorites`, `admin`, `import`),
+- `src/middleware/auth.ts` — autoryzacja JWT,
+- `src/jobs/ftpWatcher.ts` — cykliczne odpytywanie FTP i uruchamianie importu,
+- `src/lib/` — moduły pomocnicze (Prisma client, JWT, konfiguracja FTP, mailer, importer),
+- `prisma/schema.prisma` + `prisma/migrations/` — model bazy i migracje,
+- `prisma/seed.mjs` — seed konta administratora i danych startowych.
+
+### Frontend (`frontend/`)
+
+- `src/main.tsx`, `src/App.tsx` — wejście i routing aplikacji,
+- `src/pages/` — ekrany użytkownika i panel administratora,
+- `src/components/` — współdzielone komponenty UI,
+- `src/contexts/` — kontekst autoryzacji i danych domenowych,
+- `src/lib/api.ts` — wykrywanie/wybór aktywnego backendu,
+- `src/i18n.ts` + `frontend/i18n.ts` — konfiguracja internacjonalizacji,
+- `tailwind.config.cjs`, `postcss.config.cjs`, `vite.config.ts` — konfiguracja warstwy frontowej.
+
+### Shared (`shared/`)
+
+- `shared/importers/insurance.ts` — współdzielone parsery/mapowanie danych importowanych.
+
+## 3) Konfiguracja i uruchamianie
+
+### Workspaces
+
+`package.json` w root zawiera:
+
+- `workspaces: ["backend", "frontend"]`.
+
+To pozwala instalować zależności i używać wspólnych modułów z jednego lockfile (`package-lock.json`).
 
 ### Backend
 
-`backend/package.json`:
+`backend/package.json` udostępnia m.in.:
 
-- `dev` — uruchomienie developerskie (`ts-node-dev`),
-- `build` — generacja Prisma client + kompilacja TS,
-- `start` / `start:prod` — uruchomienie builda,
-- `prisma:migrate`, `prisma:seed` — migracje i seed danych.
+- `dev` — `ts-node-dev` (tryb developerski),
+- `build` — `prisma generate && tsc`,
+- `start` — uruchomienie zbudowanego backendu,
+- `start:prod` — migracje + start,
+- `prisma:migrate`, `prisma:seed` — operacje bazy.
 
-W runtime backend:
+`backend/tsconfig.json`:
 
-- stosuje `helmet`, `cors`, `morgan`,
-- wystawia `/api/health`,
-- rejestruje trasy `/api/auth`, `/api/cars`, `/api/offers`, `/api/favorites`, `/api/admin`,
-- mountuje statyczne obrazy pobrane przez importer FTP,
-- automatycznie tworzy/utrzymuje konta administratora,
-- uruchamia pętlę importu FTP (jeśli `FTP_IMPORT_ENABLED=true`).
+- `strict: true`,
+- alias `#shared/* -> ../shared/*`,
+- kompilacja do `dist/`.
 
 ### Frontend
 
-`frontend/package.json`:
+`frontend/package.json` udostępnia:
 
 - `dev` — Vite dev server,
 - `build` — build produkcyjny,
-- `preview` — podgląd builda.
+- `preview` — lokalny podgląd builda.
 
-`frontend/src/lib/api.ts` realizuje inteligentny fallback API:
+`frontend/tsconfig.json`:
 
-- uwzględnia `VITE_API_URL`,
-- testuje lokalny host w development,
-- sonduje `/api/health` na kilku kandydatach,
-- zapamiętuje działający URL w `localStorage`.
+- `strict: true`,
+- alias `@shared/* -> ../shared/*`,
+- `jsx: react-jsx`.
 
-### Deployment
+`frontend/vite.config.ts` utrzymuje alias `@shared` oraz plugin React.
 
-- `render.yaml` definiuje usługę backendu, bazę PostgreSQL i persistent disk na obrazy z FTP.
-- README opisuje deployment backendu na Render oraz frontendu na Vercel.
-
-## 4. Zależności
+## 4) Zależności
 
 ### Backend (runtime)
 
@@ -88,7 +95,8 @@ W runtime backend:
 
 ### Backend (dev)
 
-- `typescript`, `@types/*` dla używanych bibliotek.
+- `typescript`,
+- pakiety `@types/*` dla używanych bibliotek.
 
 ### Frontend (runtime)
 
@@ -102,28 +110,48 @@ W runtime backend:
 - `tailwindcss`, `postcss`, `autoprefixer`,
 - `typescript`.
 
-## 5. Model danych (Prisma)
+## 5) Infrastruktura i środowiska
 
-Kluczowe modele i relacje:
+### Render
 
-- `User` — użytkownicy, role (`USER`/`ADMIN`), status rejestracji,
-- `Car` + `CarImage` — aukcje i obrazy,
-- `Offer` — oferty użytkowników na samochody,
-- `Favorite` — ulubione ogłoszenia,
-- `ImportJob` — historia i wynik importów.
+`render.yaml` definiuje:
 
-W modelach występują indeksy wspierające zapytania listujące (`Car`, `Offer`, `Favorite`, `CarImage`) oraz ograniczenia unikalności (`User.email`, `Car.displayId`, `Favorite[userId,carId]`, `ImportJob.filename`).
+- usługę web `autoszczech-backend` (Node),
+- bazę `autoszczech-db` (PostgreSQL),
+- dysk persistent montowany jako `/var/data` (pod obrazy z FTP),
+- build/start command zgodne z backendowymi skryptami npm,
+- zestaw envów dla importera FTP i publicznego adresu backendu.
 
-## 6. Przepływy funkcjonalne
+### Vercel
 
-1. Frontend wybiera dostępny backend i komunikuje się przez REST.
-2. Backend obsługuje autoryzację JWT oraz operacje domenowe (samochody, oferty, ulubione, admin).
-3. Watcher FTP okresowo pobiera pliki JSON i zdjęcia, aktualizuje bazę i publikuje obrazy statycznie.
-4. Historia importów jest zapisywana w `ImportJob`, co wspiera monitoring i diagnostykę.
+Frontend jest przygotowany do wdrożenia z katalogu `frontend/`.
 
-## 7. Wnioski
+### Zmienne środowiskowe
 
-- Projekt ma spójną strukturę monorepo i wyraźny podział odpowiedzialności frontend/backend/shared.
-- Wdrożenie produkcyjne jest zautomatyzowane (Render blueprint + konfiguracja środowiskowa).
-- Logika fallback API i importu FTP zwiększa odporność operacyjną aplikacji.
-- W repozytorium nadal występują jawne wartości przykładowych sekretów/poświadczeń w dokumentacji i konfiguracji — warto je traktować wyłącznie jako dane testowe i rotować w środowisku produkcyjnym.
+`.env.example` obejmuje konfigurację:
+
+- bazy i JWT,
+- importu FTP,
+- SMTP/mailingu,
+- URL-i backendu/frontendu.
+
+## 6) Przepływy funkcjonalne
+
+1. Frontend ustala działający adres API (`VITE_API_URL` + fallback przez `/api/health`).
+2. Backend wystawia REST API i obsługuje JWT.
+3. Watcher FTP pobiera JSON-y i zdjęcia, przetwarza je oraz zapisuje historię importów.
+4. Panel admina umożliwia operacje zarządcze i ręczne uruchamianie importu.
+
+## 7) Weryfikacja techniczna wykonana podczas analizy
+
+W ramach analizy uruchomiono build obu aplikacji:
+
+- backend: `npm run build --prefix backend` — **OK**,
+- frontend: `npm run build --prefix frontend` — **OK** (z ostrzeżeniem Vite o chunku ~502 kB).
+
+## 8) Wnioski i rekomendacje
+
+- Architektura jest spójna i czytelna: wyraźny podział backend/frontend/shared.
+- Konfiguracja wdrożeniowa jest kompletna (Render Blueprint + wskazówki Vercel).
+- Warto rozważyć optymalizację bundle frontendu (code splitting), aby ograniczyć duży główny chunk.
+- W dokumentacji i `.env.example` widoczne są przykładowe dane wrażliwe — należy traktować je wyłącznie testowo i rotować w środowisku produkcyjnym.
