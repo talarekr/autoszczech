@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { useTranslation } from "react-i18next";
 
@@ -8,6 +8,7 @@ import { sampleCars } from "../data/sampleCars";
 import { useInventory } from "../contexts/InventoryContext";
 import { getApiUrl } from "../lib/api";
 import { getHomeListingsCache, setHomeListingsCache } from "../lib/homeListingsCache";
+import { clearHomeScrollRestore, readHomeScrollRestore } from "../lib/homeScrollRestore";
 import {
   InsuranceProviderKey,
   orderedInsuranceProviders,
@@ -57,10 +58,13 @@ const dedupeCars = (cars: Car[]) => {
 export default function Home() {
   const { cars, replaceBaseCars } = useInventory();
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState<boolean>(false);
   const [isBackgroundLoading, setIsBackgroundLoading] = useState<boolean>(false);
   const [errorKey, setErrorKey] = useState<MessageKey>(null);
   const [statusMessageKey, setStatusMessageKey] = useState<MessageKey>(null);
+  const [logoutMessageKey, setLogoutMessageKey] = useState<MessageKey>(null);
   const [usingSampleData, setUsingSampleData] = useState<boolean>(
     () => cars.length === 0 || cars.every((car) => (car.source ?? "").toLowerCase() === "sample")
   );
@@ -73,6 +77,7 @@ export default function Home() {
   const [loadedCount, setLoadedCount] = useState<number>(cars.length);
   const requestVersionRef = useRef(0);
   const restoredScrollForKeyRef = useRef<string | null>(null);
+  const restoredCardForKeyRef = useRef<string | null>(null);
   const { t } = useTranslation();
 
   const providerOptions = useMemo(
@@ -95,6 +100,14 @@ export default function Home() {
   const queryKey = useMemo(() => nextSearchParams.toString() || "__default__", [nextSearchParams]);
 
   useEffect(() => {
+    const state = location.state as { logoutSuccess?: unknown } | null;
+    if (!state?.logoutSuccess) return;
+
+    setLogoutMessageKey("home.logoutSuccess");
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: {} });
+  }, [location.pathname, location.search, location.state, navigate]);
+
+  useEffect(() => {
     if (nextSearchParams.toString() === searchParams.toString()) return;
     setSearchParams(nextSearchParams, { replace: true });
   }, [nextSearchParams, searchParams, setSearchParams]);
@@ -108,11 +121,37 @@ export default function Home() {
     replaceBaseCars(cacheEntry.cars, "api");
     setUsingSampleData(false);
 
-    if (restoredScrollForKeyRef.current !== queryKey) {
+    const pendingRestore = readHomeScrollRestore();
+    const hasPendingCardRestore = pendingRestore?.queryKey === queryKey;
+
+    if (!hasPendingCardRestore && restoredScrollForKeyRef.current !== queryKey) {
       restoredScrollForKeyRef.current = queryKey;
       window.requestAnimationFrame(() => window.scrollTo({ top: cacheEntry.scrollY, behavior: "auto" }));
     }
   }, [queryKey, replaceBaseCars]);
+
+
+  useEffect(() => {
+    const pendingRestore = readHomeScrollRestore();
+    if (!pendingRestore || pendingRestore.queryKey !== queryKey) return;
+    if (restoredCardForKeyRef.current === queryKey) return;
+
+    const card = document.getElementById(`car-card-${pendingRestore.carId}`);
+    if (!card) return;
+
+    restoredCardForKeyRef.current = queryKey;
+    const top = card.getBoundingClientRect().top + window.scrollY + pendingRestore.offsetWithinCard;
+    const scrollTop = Math.max(0, top);
+
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: scrollTop, behavior: "auto" });
+      const current = getHomeListingsCache(queryKey);
+      if (current) {
+        setHomeListingsCache(queryKey, { ...current, scrollY: scrollTop });
+      }
+      clearHomeScrollRestore();
+    });
+  }, [cars.length, isBackgroundLoading, loading, queryKey]);
 
   useEffect(() => {
     requestVersionRef.current += 1;
@@ -373,6 +412,10 @@ export default function Home() {
             </label>
           </div>
         </div>
+
+        {logoutMessageKey && (
+          <p className="rounded-3xl bg-emerald-50 px-6 py-4 text-sm font-medium text-emerald-700 shadow-sm">{t(logoutMessageKey)}</p>
+        )}
 
         {statusMessageKey && (
           <p className="rounded-3xl bg-amber-50 px-6 py-4 text-sm font-medium text-amber-700 shadow-sm">{t(statusMessageKey)}</p>
