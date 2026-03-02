@@ -206,45 +206,4 @@ r.delete("/users/:id/reject", auth("ADMIN"), async (req: Request, res: Response)
   }
 });
 
-r.get("/won-auctions", auth("ADMIN"), async (_req: Request, res: Response) => {
-  try {
-    const cars = await prisma.car.findMany({
-      where: {
-        offers: {
-          some: {
-            winnerStatus: "AWARDED",
-            isWinner: true,
-          },
-        },
-      },
-      include: {
-        images: { orderBy: { order: "asc" } },
-        offers: {
-          where: {
-            winnerStatus: "AWARDED",
-            isWinner: true,
-          },
-          include: {
-            user: {
-              select: {
-                id: true,
-                email: true,
-                firstName: true,
-                lastName: true,
-              },
-            },
-          },
-          orderBy: { createdAt: "desc" },
-        },
-      },
-      orderBy: { updatedAt: "desc" },
-    });
-
-    res.json({ cars });
-  } catch (error) {
-    console.error("Nie udało się pobrać aukcji wygranych", error);
-    res.status(500).json({ error: "Nie udało się pobrać aukcji wygranych" });
-  }
-});
-
 export default r;
