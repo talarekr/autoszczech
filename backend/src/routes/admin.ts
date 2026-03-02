@@ -178,4 +178,32 @@ r.patch("/users/:id/approve", auth("ADMIN"), async (req: Request, res: Response)
   }
 });
 
+
+r.delete("/users/:id/reject", auth("ADMIN"), async (req: Request, res: Response) => {
+  const userId = Number(req.params.id);
+  if (!Number.isFinite(userId)) return res.status(400).json({ error: "Nieprawidłowe ID użytkownika" });
+
+  try {
+    const existing = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, registrationStatus: true },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: "Użytkownik nie istnieje" });
+    }
+
+    if (existing.registrationStatus !== RegistrationStatus.PENDING) {
+      return res.status(400).json({ error: "Odrzucić można tylko oczekujące zgłoszenia" });
+    }
+
+    await prisma.user.delete({ where: { id: userId } });
+
+    res.json({ id: userId, rejected: true });
+  } catch (error) {
+    console.error("Nie udało się odrzucić zgłoszenia użytkownika", error);
+    res.status(500).json({ error: "Nie udało się odrzucić zgłoszenia użytkownika" });
+  }
+});
+
 export default r;
