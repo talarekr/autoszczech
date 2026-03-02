@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { useCountdown } from "../hooks/useCountdown";
@@ -10,6 +10,7 @@ import {
   transmissionTranslationKey,
 } from "../lib/lookups";
 import { Car } from "../types/car";
+import { writeHomeScrollRestore } from "../lib/homeScrollRestore";
 
 interface CarCardProps {
   car: Car;
@@ -19,7 +20,20 @@ export default function CarCard({ car }: CarCardProps) {
   const countdown = useCountdown(car.auctionEnd ?? undefined);
   const thumbnail = car.images?.[0]?.url;
   const { t } = useTranslation();
+  const location = useLocation();
   const detailUrl = `/offer/${car.id}`;
+
+  const handleOpenDetails = () => {
+    if (location.pathname !== "/") return;
+    const cardElement = document.getElementById(`car-card-${car.id}`);
+    const cardTop = cardElement ? cardElement.getBoundingClientRect().top + window.scrollY : window.scrollY;
+
+    writeHomeScrollRestore({
+      queryKey: location.search.replace(/^\?/, "") || "__default__",
+      carId: car.id,
+      offsetWithinCard: window.scrollY - cardTop,
+    });
+  };
   const normalizedFuel = normalizeFuelType(car.fuelType);
   const normalizedTransmission = normalizeTransmission(car.transmission);
   const fuelLabel = normalizedFuel
@@ -30,10 +44,14 @@ export default function CarCard({ car }: CarCardProps) {
     : car.transmission ?? "—";
 
   return (
-    <article className="grid overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-neutral-200 transition hover:-translate-y-1 hover:shadow-lg md:grid-cols-[minmax(0,320px),1fr]">
+    <article
+      id={`car-card-${car.id}`}
+      className="grid overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-neutral-200 transition hover:-translate-y-1 hover:shadow-lg md:grid-cols-[minmax(0,320px),1fr]"
+    >
       <Link
         to={detailUrl}
         className="relative h-full w-full min-h-[220px] bg-neutral-100 md:min-h-[260px]"
+        onClick={handleOpenDetails}
         aria-label={t("carCard.viewDetails")}
       >
         <div className="relative h-full w-full">
@@ -128,6 +146,7 @@ export default function CarCard({ car }: CarCardProps) {
           <Link
             to={`/offer/${car.id}`}
             className="inline-flex items-center justify-center rounded-full bg-red-600 px-8 py-3 text-sm font-semibold uppercase tracking-widest text-white shadow-sm transition hover:bg-red-500"
+            onClick={handleOpenDetails}
           >
             {t("carCard.viewDetails")}
           </Link>

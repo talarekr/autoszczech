@@ -8,6 +8,7 @@ import { sampleCars } from "../data/sampleCars";
 import { useInventory } from "../contexts/InventoryContext";
 import { getApiUrl } from "../lib/api";
 import { getHomeListingsCache, setHomeListingsCache } from "../lib/homeListingsCache";
+import { clearHomeScrollRestore, readHomeScrollRestore } from "../lib/homeScrollRestore";
 import {
   InsuranceProviderKey,
   orderedInsuranceProviders,
@@ -73,6 +74,7 @@ export default function Home() {
   const [loadedCount, setLoadedCount] = useState<number>(cars.length);
   const requestVersionRef = useRef(0);
   const restoredScrollForKeyRef = useRef<string | null>(null);
+  const restoredCardForKeyRef = useRef<string | null>(null);
   const { t } = useTranslation();
 
   const providerOptions = useMemo(
@@ -108,11 +110,37 @@ export default function Home() {
     replaceBaseCars(cacheEntry.cars, "api");
     setUsingSampleData(false);
 
-    if (restoredScrollForKeyRef.current !== queryKey) {
+    const pendingRestore = readHomeScrollRestore();
+    const hasPendingCardRestore = pendingRestore?.queryKey === queryKey;
+
+    if (!hasPendingCardRestore && restoredScrollForKeyRef.current !== queryKey) {
       restoredScrollForKeyRef.current = queryKey;
       window.requestAnimationFrame(() => window.scrollTo({ top: cacheEntry.scrollY, behavior: "auto" }));
     }
   }, [queryKey, replaceBaseCars]);
+
+
+  useEffect(() => {
+    const pendingRestore = readHomeScrollRestore();
+    if (!pendingRestore || pendingRestore.queryKey !== queryKey) return;
+    if (restoredCardForKeyRef.current === queryKey) return;
+
+    const card = document.getElementById(`car-card-${pendingRestore.carId}`);
+    if (!card) return;
+
+    restoredCardForKeyRef.current = queryKey;
+    const top = card.getBoundingClientRect().top + window.scrollY + pendingRestore.offsetWithinCard;
+    const scrollTop = Math.max(0, top);
+
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: scrollTop, behavior: "auto" });
+      const current = getHomeListingsCache(queryKey);
+      if (current) {
+        setHomeListingsCache(queryKey, { ...current, scrollY: scrollTop });
+      }
+      clearHomeScrollRestore();
+    });
+  }, [cars.length, isBackgroundLoading, loading, queryKey]);
 
   useEffect(() => {
     requestVersionRef.current += 1;
