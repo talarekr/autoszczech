@@ -73,7 +73,6 @@ export default function Home() {
   const [loadedCount, setLoadedCount] = useState<number>(cars.length);
   const requestVersionRef = useRef(0);
   const restoredScrollForKeyRef = useRef<string | null>(null);
-  const pendingRestoreRef = useRef<{ key: string; scrollY: number; attempts: number } | null>(null);
   const { t } = useTranslation();
 
   const providerOptions = useMemo(
@@ -110,54 +109,10 @@ export default function Home() {
     setUsingSampleData(false);
 
     if (restoredScrollForKeyRef.current !== queryKey) {
-      pendingRestoreRef.current = { key: queryKey, scrollY: cacheEntry.scrollY, attempts: 0 };
+      restoredScrollForKeyRef.current = queryKey;
+      window.requestAnimationFrame(() => window.scrollTo({ top: cacheEntry.scrollY, behavior: "auto" }));
     }
   }, [queryKey, replaceBaseCars]);
-
-  useEffect(() => {
-    const restoreState = pendingRestoreRef.current;
-    if (!restoreState || restoreState.key !== queryKey) return;
-
-    const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
-    const target = Math.min(restoreState.scrollY, maxScroll);
-
-    if (Math.abs(window.scrollY - target) <= 1) {
-      restoredScrollForKeyRef.current = queryKey;
-      pendingRestoreRef.current = null;
-      return;
-    }
-
-    window.requestAnimationFrame(() => {
-      window.scrollTo({ top: target, behavior: "auto" });
-    });
-
-    restoreState.attempts += 1;
-    if (restoreState.attempts >= 25 || maxScroll >= restoreState.scrollY) {
-      restoredScrollForKeyRef.current = queryKey;
-      pendingRestoreRef.current = null;
-    }
-  }, [cars.length, queryKey]);
-
-  useEffect(() => {
-    const persistScroll = () => {
-      const current = getHomeListingsCache(queryKey);
-      if (!current) return;
-      setHomeListingsCache(queryKey, { ...current, scrollY: window.scrollY });
-    };
-
-    const onScroll = () => {
-      persistScroll();
-    };
-
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("pagehide", persistScroll);
-
-    return () => {
-      persistScroll();
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("pagehide", persistScroll);
-    };
-  }, [queryKey]);
 
   useEffect(() => {
     requestVersionRef.current += 1;
