@@ -10,6 +10,9 @@ import type { AdminUser } from "../types/user";
 
 type AdminOffer = CarOffer & { user?: { id: number; email: string } };
 type AdminCar = Car & { offers: AdminOffer[] };
+type WonAuction = AdminCar & {
+  offers: Array<AdminOffer & { user?: { id: number; email: string; firstName?: string | null; lastName?: string | null } }>;
+};
 
 type WinnerButtonState = {
   carId: number;
@@ -23,7 +26,7 @@ const statusTone: Record<WinnerStatus, string> = {
 };
 
 const insurersFallback = ["AXA", "ALLIANZ", "SCC", "BEST", "REST"];
-type AdminSection = "AUCTIONS" | "CLIENTS";
+type AdminSection = "AUCTIONS" | "CLIENTS" | "WON_AUCTIONS";
 
 export default function Admin() {
   const { t } = useTranslation();
@@ -389,6 +392,12 @@ export default function Admin() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSection, token, isAdmin]);
 
+  useEffect(() => {
+    if (activeSection !== "WON_AUCTIONS") return;
+    fetchWonAuctions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSection, token, isAdmin]);
+
   const handleSetWinner = async (carId: number, offerId: number, status: WinnerStatus) => {
     if (!token || !isAdmin) return;
     setSaving({ carId, offerId, status });
@@ -553,11 +562,29 @@ export default function Admin() {
             >
               {t("admin.clients.tab")}
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveSection("WON_AUCTIONS");
+                setExpandedAuction(null);
+              }}
+              className={`rounded-full px-4 py-2 text-sm font-semibold shadow-sm ring-1 transition ${
+                activeSection === "WON_AUCTIONS"
+                  ? "bg-neutral-900 text-white ring-neutral-800"
+                  : "bg-white text-neutral-700 ring-neutral-200 hover:bg-red-50 hover:text-red-700"
+              }`}
+            >
+              {t("admin.wonAuctions.tab")}
+            </button>
           </div>
           <button
             type="button"
             onClick={() =>
-              activeSection === "AUCTIONS" ? fetchAuctions(activeInsurer) : fetchPendingUsers()
+              activeSection === "AUCTIONS"
+                ? fetchAuctions(activeInsurer)
+                : activeSection === "CLIENTS"
+                  ? fetchPendingUsers()
+                  : fetchWonAuctions()
             }
             className="ml-auto inline-flex items-center justify-center rounded-full bg-neutral-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-neutral-800"
           >
@@ -713,7 +740,7 @@ export default function Admin() {
               </div>
             )}
           </>
-        ) : (
+        ) : activeSection === "CLIENTS" ? (
           <div className="space-y-4">
             {clientsError && <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{clientsError}</div>}
             <div className="grid gap-4 lg:grid-cols-2">
@@ -936,6 +963,49 @@ export default function Admin() {
                 )}
               </div>
             </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {wonAuctionsError && <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{wonAuctionsError}</div>}
+            {wonAuctionsLoading ? (
+              <div className="rounded-2xl border border-dashed border-neutral-200 bg-neutral-50 p-6 text-center text-neutral-600">
+                {t("admin.wonAuctions.loading")}
+              </div>
+            ) : wonAuctions.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-neutral-200 bg-neutral-50 p-6 text-center text-neutral-600">
+                {t("admin.wonAuctions.empty")}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {wonAuctions.map((auction) => {
+                  const winner = auction.offers.find((offer) => offer.winnerStatus === "AWARDED" && offer.isWinner);
+                  const winnerName = [winner?.user?.firstName, winner?.user?.lastName].filter(Boolean).join(" ") || t("admin.clients.unknownName");
+                  return (
+                    <article key={auction.id} className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">
+                            ID: {auction.displayId ?? auction.id}
+                          </p>
+                          <h3 className="text-lg font-semibold text-neutral-900">{auction.make} {auction.model}</h3>
+                          <p className="text-sm text-neutral-600">{auction.provider ?? "—"} · {formatDateTime(auction.auctionEnd)}</p>
+                        </div>
+                        <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-800 ring-1 ring-emerald-200">
+                          {t("admin.bids.status.AWARDED")}
+                        </span>
+                      </div>
+
+                      <div className="rounded-xl bg-neutral-50 p-3 text-sm text-neutral-700">
+                        <p><span className="font-semibold">{t("admin.wonAuctions.winner")}: </span>{winnerName}</p>
+                        <p><span className="font-semibold">{t("admin.wonAuctions.winnerEmail")}: </span>{winner?.user?.email ?? `ID: ${winner?.userId ?? "—"}`}</p>
+                        <p><span className="font-semibold">{t("admin.wonAuctions.winningBid")}: </span>{winner ? formatCurrency(winner.amount) : "—"}</p>
+                        <p><span className="font-semibold">{t("admin.wonAuctions.awardedAt")}: </span>{winner?.createdAt ? formatDateTime(winner.createdAt) : "—"}</p>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </section>

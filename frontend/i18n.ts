@@ -642,6 +642,17 @@ export const resources = {
           },
           unknownName: "Nieznane dane",
         },
+        wonAuctions: {
+          tab: "Aukcje wygrane",
+          authRequired: "Zaloguj się jako administrator, aby przeglądać aukcje wygrane.",
+          loadError: "Nie udało się pobrać aukcji wygranych.",
+          loading: "Ładuję aukcje wygrane…",
+          empty: "Brak aukcji oznaczonych jako „Wygrana przyznana”.",
+          winner: "Klient",
+          winnerEmail: "E-mail klienta",
+          winningBid: "Wygrana oferta",
+          awardedAt: "Data przyznania",
+        },
         integrator: {
           title: "Importer ofert z plików JSON",
           description:
@@ -1659,6 +1670,17 @@ export const resources = {
             APPROVED: "Active account",
           },
           unknownName: "Unknown",
+        },
+        wonAuctions: {
+          tab: "Won auctions",
+          authRequired: "Sign in as an administrator to review won auctions.",
+          loadError: "Could not load won auctions.",
+          loading: "Loading won auctions…",
+          empty: "No auctions marked as 'Win granted'.",
+          winner: "Client",
+          winnerEmail: "Client e-mail",
+          winningBid: "Winning bid",
+          awardedAt: "Awarded at",
         },
         integrator: {
           title: "JSON offer import",
@@ -2679,6 +2701,17 @@ export const resources = {
             APPROVED: "Aktives Konto",
           },
           unknownName: "Unbekannt",
+        },
+        wonAuctions: {
+          tab: "Gewonnene Auktionen",
+          authRequired: "Bitte als Administrator anmelden, um gewonnene Auktionen einzusehen.",
+          loadError: "Gewonnene Auktionen konnten nicht geladen werden.",
+          loading: "Gewonnene Auktionen werden geladen…",
+          empty: "Keine Auktionen mit Status „Gewinn zuerkannt“.",
+          winner: "Kunde",
+          winnerEmail: "E-Mail des Kunden",
+          winningBid: "Gewinngebot",
+          awardedAt: "Datum der Zuerkennung",
         },
         integrator: {
           title: "JSON-Angebotsimport",
