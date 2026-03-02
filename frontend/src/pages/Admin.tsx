@@ -51,6 +51,7 @@ export default function Admin() {
   const [clientsLoading, setClientsLoading] = useState(false);
   const [clientsError, setClientsError] = useState<string | null>(null);
   const [approvingUserId, setApprovingUserId] = useState<number | null>(null);
+  const [rejectingUserId, setRejectingUserId] = useState<number | null>(null);
 
   const isAdmin = isLoggedIn && userRole === "ADMIN";
 
@@ -299,21 +300,69 @@ export default function Admin() {
     searchClients({ forceAll: true });
   };
 
-  const handleClearDateFilter = () => {
-    setClientsDateFrom("");
-    setClientsDateTo("");
+  const handleExportClientsCsv = () => {
+    if (!clientsDateFrom && !clientsDateTo) return;
 
-    if (showAllClients) {
-      searchClients({ forceAll: true });
-      return;
-    }
+    const formKeys = Array.from(
+      new Set(
+        searchedUsers.flatMap((user) =>
+          user.registrationForm && typeof user.registrationForm === "object"
+            ? Object.keys(user.registrationForm)
+            : []
+        )
+      )
+    );
 
-    if (clientSearch.trim()) {
-      searchClients();
-      return;
-    }
+    const headers = [
+      "id",
+      "email",
+      "firstName",
+      "lastName",
+      "registrationStatus",
+      "createdAt",
+      ...formKeys,
+    ];
 
-    setSearchedUsers([]);
+    const escapeValue = (value: unknown) => {
+      if (value === null || value === undefined) return "";
+      const stringValue =
+        typeof value === "object" ? JSON.stringify(value) : String(value);
+      return `"${stringValue.replace(/"/g, '""')}"`;
+    };
+
+    const rows = searchedUsers.map((user) => {
+      const baseValues = [
+        user.id,
+        user.email,
+        user.firstName ?? "",
+        user.lastName ?? "",
+        user.registrationStatus ?? "",
+        user.createdAt,
+      ];
+
+      const formValues = formKeys.map((key) => {
+        if (!user.registrationForm || typeof user.registrationForm !== "object") {
+          return "";
+        }
+        return user.registrationForm[key as keyof typeof user.registrationForm] ?? "";
+      });
+
+      return [...baseValues, ...formValues].map(escapeValue).join(",");
+    });
+
+    const csvContent = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    const from = clientsDateFrom || "all";
+    const to = clientsDateTo || "all";
+
+    link.href = url;
+    link.setAttribute("download", `clients-${from}-to-${to}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   useEffect(() => {
@@ -418,6 +467,27 @@ export default function Admin() {
       setClientsError(t("admin.clients.approveError"));
     } finally {
       setApprovingUserId(null);
+    }
+  };
+
+  const handleRejectUser = async (userId: number) => {
+    if (!token || !isAdmin) return;
+    setRejectingUserId(userId);
+    setClientsError(null);
+
+    try {
+      const apiUrl = await getApiUrl();
+      await axios.delete(`${apiUrl}/api/admin/users/${userId}/reject`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setPendingUsers((prev) => prev.filter((user) => user.id !== userId));
+      setSearchedUsers((prev) => prev.filter((user) => user.id !== userId));
+    } catch (err) {
+      console.error("Nie udało się odrzucić użytkownika", err);
+      setClientsError(t("admin.clients.rejectError"));
+    } finally {
+      setRejectingUserId(null);
     }
   };
 
@@ -683,16 +753,28 @@ export default function Admin() {
                             <p className="text-sm text-neutral-700">{user.email}</p>
                             <p className="text-xs text-neutral-500">{formatDateTime(user.createdAt)}</p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleApproveUser(user.id)}
-                            disabled={approvingUserId === user.id}
-                            className="shrink-0 rounded-full bg-emerald-600 px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-70"
-                          >
-                            {approvingUserId === user.id
-                              ? t("admin.clients.approving")
-                              : t("admin.clients.approve")}
-                          </button>
+                          <div className="flex shrink-0 items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleApproveUser(user.id)}
+                              disabled={approvingUserId === user.id || rejectingUserId === user.id}
+                              className="rounded-full bg-emerald-600 px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-70"
+                            >
+                              {approvingUserId === user.id
+                                ? t("admin.clients.approving")
+                                : t("admin.clients.approve")}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRejectUser(user.id)}
+                              disabled={rejectingUserId === user.id || approvingUserId === user.id}
+                              className="rounded-full bg-neutral-700 px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white shadow-sm transition hover:bg-neutral-800 disabled:opacity-70"
+                            >
+                              {rejectingUserId === user.id
+                                ? t("admin.clients.rejecting")
+                                : t("admin.clients.reject")}
+                            </button>
+                          </div>
                         </div>
                         {buildUserDetails(user).length > 0 ? (
                           <dl className="grid gap-1 text-xs text-neutral-700 sm:grid-cols-2">
@@ -777,10 +859,11 @@ export default function Admin() {
                       </button>
                       <button
                         type="button"
-                        onClick={handleClearDateFilter}
-                        className="rounded-full border border-neutral-300 bg-white px-5 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-neutral-700 shadow-sm transition hover:bg-neutral-100"
+                        onClick={handleExportClientsCsv}
+                        disabled={clientsLoading || searchedUsers.length === 0 || (!clientsDateFrom && !clientsDateTo)}
+                        className="whitespace-nowrap rounded-full border border-neutral-300 bg-white px-5 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-neutral-700 shadow-sm transition hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        {t("admin.clients.clearDateCta")}
+                        {t("admin.clients.exportCsvCta")}
                       </button>
                     </div>
                   </div>
