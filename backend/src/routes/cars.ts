@@ -1,9 +1,24 @@
+import { createHash } from "node:crypto";
+
 import { Prisma } from "@prisma/client";
 import { Router, Request, Response } from "express";
 
 import prisma from "../lib/prisma.js";
 import { importInsurancePayload } from "../lib/insuranceImporter.js";
 import { auth } from "../middleware/auth.js";
+
+const COUNT_CACHE_TTL_MS = 10_000;
+const LIST_CACHE_TTL_MS = 20_000;
+
+const countCache = new Map<string, { expiresAt: number; value: number }>();
+const listCache = new Map<string, { expiresAt: number; payload: string; etag: string }>();
+
+const invalidateListCaches = () => {
+  countCache.clear();
+  listCache.clear();
+};
+
+type SortOption = "endingAsc" | "endingDesc" | "newest";
 
 const parseNumber = (value: unknown): number | null | undefined => {
   if (value === undefined) {
@@ -91,25 +106,141 @@ const toThumbnailUrl = (url: string) => {
   return `${trimmed}${trimmed.includes("?") ? "&" : "?"}w=400`;
 };
 
+const normalizeSort = (value: unknown): SortOption => {
+  if (value === "endingDesc" || value === "newest") {
+    return value;
+  }
+  return "endingAsc";
+};
+
+const normalizeCacheKey = (prefix: string, query: Record<string, unknown>) => {
+  const entries = Object.entries(query)
+    .map(([key, value]) => [key, Array.isArray(value) ? value.join(",") : String(value ?? "")] as const)
+    .sort(([a], [b]) => a.localeCompare(b));
+
+  return `${prefix}:${entries.map(([k, v]) => `${k}=${v}`).join("&")}`;
+};
+
+const getCarsWhere = (query: Request["query"]): Prisma.CarWhereInput => {
+  const q = typeof query.q === "string" ? query.q.trim() : "";
+  const provider = typeof query.provider === "string" ? query.provider.trim() : "";
+  const yearFrom = parseOptionalPositiveInt(query.yearFrom);
+  const yearTo = parseOptionalPositiveInt(query.yearTo);
+  const includeArchived = String(query.includeArchived ?? "false").toLowerCase() === "true";
+
+  const andFilters: Prisma.CarWhereInput[] = [{ adminDismissed: false }];
+
+  if (!includeArchived) {
+    andFilters.push({
+      OR: [{ auctionEnd: null }, { auctionEnd: { gt: new Date() } }],
+    });
+  }
+
+  if (q) {
+    andFilters.push({
+      OR: [
+        { make: { contains: q, mode: "insensitive" } },
+        { model: { contains: q, mode: "insensitive" } },
+        { displayId: { contains: q, mode: "insensitive" } },
+      ],
+    });
+  }
+
+  if (provider) {
+    andFilters.push({ provider: { equals: provider, mode: "insensitive" } });
+  }
+
+  if (yearFrom !== undefined || yearTo !== undefined) {
+    andFilters.push({
+      year: {
+        ...(yearFrom !== undefined ? { gte: yearFrom } : {}),
+        ...(yearTo !== undefined ? { lte: yearTo } : {}),
+      },
+    });
+  }
+
+  return { AND: andFilters };
+};
+
+const getCarsOrderBy = (query: Request["query"]): Prisma.CarOrderByWithRelationInput[] => {
+  const sort = normalizeSort(query.sort);
+
+  if (sort === "newest") {
+    return [{ createdAt: "desc" }, { id: "desc" }];
+  }
+
+  if (sort === "endingDesc") {
+    return [{ auctionEnd: "desc" }, { createdAt: "desc" }, { id: "desc" }];
+  }
+
+  return [{ auctionEnd: "asc" }, { createdAt: "desc" }, { id: "desc" }];
+};
+
 const r = Router();
 
+r.get("/count", async (req: Request, res: Response) => {
+  const cacheKey = normalizeCacheKey("count", req.query);
+  const cached = countCache.get(cacheKey);
+
+  if (cached && cached.expiresAt > Date.now()) {
+    return res.json({ count: cached.value });
+  }
+
+  const where = getCarsWhere(req.query);
+  const count = await prisma.car.count({ where });
+  countCache.set(cacheKey, { value: count, expiresAt: Date.now() + COUNT_CACHE_TTL_MS });
+
+  return res.json({ count });
+});
+
 r.get("/", async (req: Request, res: Response) => {
+  const limit = Math.min(parsePositiveInt(req.query.limit, 50), 200);
   const page = parsePositiveInt(req.query.page, 1);
-  const requestedLimit = parseOptionalPositiveInt(req.query.limit);
-  const limit = requestedLimit ? Math.min(requestedLimit, 2000) : undefined;
-  const skip = limit ? (page - 1) * limit : 0;
+  const skip = req.query.offset !== undefined ? Math.max(0, Number(req.query.offset) || 0) : (page - 1) * limit;
+
+  const cacheKey = normalizeCacheKey("list", { ...req.query, limit, skip });
+  const cached = listCache.get(cacheKey);
+
+  if (cached && cached.expiresAt > Date.now()) {
+    if (req.headers["if-none-match"] === cached.etag) {
+      return res.status(304).end();
+    }
+    res.setHeader("ETag", cached.etag);
+    res.setHeader("Cache-Control", "public, max-age=10");
+    return res.type("application/json").send(cached.payload);
+  }
+
+  const where = getCarsWhere(req.query);
+  const orderBy = getCarsOrderBy(req.query);
 
   const [total, cars] = await Promise.all([
-    prisma.car.count(),
+    prisma.car.count({ where }),
     prisma.car.findMany({
-      include: {
+      where,
+      orderBy,
+      skip,
+      take: limit,
+      select: {
+        id: true,
+        displayId: true,
+        make: true,
+        model: true,
+        year: true,
+        mileage: true,
+        price: true,
+        location: true,
+        auctionEnd: true,
+        provider: true,
+        fuelType: true,
+        transmission: true,
+        firstRegistrationDate: true,
+        source: true,
         images: {
           orderBy: { order: "asc" },
           take: 1,
+          select: { id: true, url: true },
         },
       },
-      orderBy: { id: "desc" },
-      ...(limit ? { skip, take: limit } : {}),
     }),
   ]);
 
@@ -123,16 +254,29 @@ r.get("/", async (req: Request, res: Response) => {
     };
   });
 
-  const effectiveLimit = limit ?? Math.max(total, 1);
-  const totalPages = limit ? Math.max(1, Math.ceil(total / limit)) : 1;
-
-  res.json({
-    page,
-    limit: effectiveLimit,
+  const payloadObject = {
+    offset: skip,
+    limit,
     total,
-    totalPages,
     cars: carsWithThumbnails,
+  };
+  const payload = JSON.stringify(payloadObject);
+  const etag = `W/\"${createHash("sha1").update(payload).digest("hex")}\"`;
+
+  listCache.set(cacheKey, {
+    payload,
+    etag,
+    expiresAt: Date.now() + LIST_CACHE_TTL_MS,
   });
+
+  if (req.headers["if-none-match"] === etag) {
+    return res.status(304).end();
+  }
+
+  res.setHeader("ETag", etag);
+  res.setHeader("Cache-Control", "public, max-age=10");
+
+  return res.type("application/json").send(payload);
 });
 
 r.post("/import", auth("ADMIN"), async (req: Request, res: Response) => {
@@ -172,6 +316,7 @@ r.post("/import", auth("ADMIN"), async (req: Request, res: Response) => {
     orderBy: { id: "desc" },
   });
 
+  invalidateListCaches();
   res.json({ summary, cars });
 });
 
@@ -187,129 +332,163 @@ r.get("/:id", async (req: Request, res: Response) => {
       include: { images: { orderBy: { order: "asc" } } },
     });
 
-    if (!car) return res.status(404).json({ error: "Nie znaleziono" });
-    res.json(car);
+    if (!car) return res.status(404).json({ error: "Nie znaleziono pojazdu" });
+
+    const offers = await prisma.offer.findMany({
+      where: { carId: car.id },
+      include: { user: { select: { id: true, email: true } } },
+      orderBy: { createdAt: "desc" },
+    });
+
+    res.json({ ...car, offers });
   } catch (error) {
-    console.error("Nie udało się pobrać pojazdu", error);
-    res.status(500).json({ error: "Nie udało się pobrać pojazdu" });
+    console.error("Błąd podczas pobierania pojazdu:", error);
+    res.status(500).json({ error: "Błąd serwera" });
   }
 });
 
 r.post("/", auth("ADMIN"), async (req: Request, res: Response) => {
-  const payload = req.body || {};
-  const displayId = typeof payload.displayId === "string" && payload.displayId.trim().length > 0
-    ? payload.displayId.trim()
-    : `API-${Date.now()}`;
+  try {
+    const body = req.body ?? {};
 
-  const car = await prisma.car.create({
-    data: {
-      displayId,
-      make: payload.make,
-      model: payload.model,
-      year: parseNumber(payload.year) ?? new Date().getFullYear(),
-      mileage: parseNumber(payload.mileage) ?? 0,
-      price: parseNumber(payload.price),
-      location: payload.location ?? null,
-      description: payload.description ?? null,
-      auctionStart: parseDate(payload.auctionStart),
-      auctionEnd: parseDate(payload.auctionEnd),
-      provider: payload.provider ?? null,
-      vin: payload.vin ?? null,
-      registrationNumber: payload.registrationNumber ?? null,
-      firstRegistrationDate: parseDate(payload.firstRegistrationDate),
-      fuelType: payload.fuelType ?? null,
-      transmission: payload.transmission ?? null,
-      bodyType: payload.bodyType ?? null,
-      driveType: payload.driveType ?? null,
-      power: payload.power ?? null,
-      seats: parseNumber(payload.seats),
-      doors: parseNumber(payload.doors),
-      descriptionDetails: parseDescriptionDetails(payload.descriptionDetails),
-      source: payload.source ?? "API",
-      images: {
-        create: normalizeImages(payload.images).map((image) => ({
-          url: image.url,
-          order: image.order,
-        })),
+    const auctionStart = parseDate(body.auctionStart);
+    const auctionEnd = parseDate(body.auctionEnd);
+
+    if (body.auctionStart && !auctionStart) {
+      return res.status(400).json({ error: "Nieprawidłowa data rozpoczęcia aukcji" });
+    }
+    if (body.auctionEnd && !auctionEnd) {
+      return res.status(400).json({ error: "Nieprawidłowa data zakończenia aukcji" });
+    }
+
+    const descriptionDetails = parseDescriptionDetails(body.descriptionDetails);
+
+    const car = await prisma.car.create({
+      data: {
+        displayId: body.displayId,
+        make: body.make,
+        model: body.model,
+        year: Number(body.year),
+        mileage: Number(body.mileage),
+        price: parseNumber(body.price),
+        location: body.location ?? null,
+        description: body.description ?? null,
+        descriptionDetails,
+        auctionStart,
+        auctionEnd,
+        provider: body.provider ?? null,
+        vin: body.vin ?? null,
+        registrationNumber: body.registrationNumber ?? null,
+        firstRegistrationDate: parseDate(body.firstRegistrationDate),
+        fuelType: body.fuelType ?? null,
+        transmission: body.transmission ?? null,
+        bodyType: body.bodyType ?? null,
+        driveType: body.driveType ?? null,
+        power: body.power ?? null,
+        seats: parseNumber(body.seats),
+        doors: parseNumber(body.doors),
+        images: {
+          create: normalizeImages(body.images).map((img) => ({ url: img.url, order: img.order })),
+        },
       },
-    },
-    include: { images: { orderBy: { order: "asc" } }, offers: true },
-  });
-  res.json(car);
+      include: { images: { orderBy: { order: "asc" } } },
+    });
+
+    invalidateListCaches();
+    res.status(201).json(car);
+  } catch (error) {
+    console.error("Błąd tworzenia pojazdu:", error);
+    res.status(400).json({ error: "Nie udało się utworzyć pojazdu" });
+  }
 });
 
 r.put("/:id", auth("ADMIN"), async (req: Request, res: Response) => {
   const id = Number(req.params.id);
-  const payload = req.body || {};
-
   if (!Number.isFinite(id)) {
-    return res.status(400).json({ error: "Nieprawidłowe ID pojazdu" });
+    return res.status(400).json({ error: "Nieprawidłowe ID" });
   }
 
   try {
-    const car = await prisma.car.update({
+    const body = req.body ?? {};
+
+    const auctionStart = parseDate(body.auctionStart);
+    const auctionEnd = parseDate(body.auctionEnd);
+
+    if (body.auctionStart && !auctionStart) {
+      return res.status(400).json({ error: "Nieprawidłowa data rozpoczęcia aukcji" });
+    }
+    if (body.auctionEnd && !auctionEnd) {
+      return res.status(400).json({ error: "Nieprawidłowa data zakończenia aukcji" });
+    }
+
+    const descriptionDetails = parseDescriptionDetails(body.descriptionDetails);
+
+    const updated = await prisma.car.update({
       where: { id },
       data: {
-        displayId:
-          typeof payload.displayId === "string" && payload.displayId.trim().length > 0
-            ? payload.displayId.trim()
-            : undefined,
-        make: payload.make,
-        model: payload.model,
-        year: parseNumber(payload.year) ?? undefined,
-        mileage: parseNumber(payload.mileage) ?? undefined,
-        price: parseNumber(payload.price),
-        location: payload.location ?? null,
-        description: payload.description ?? null,
-        auctionStart: parseDate(payload.auctionStart),
-        auctionEnd: parseDate(payload.auctionEnd),
-        provider: payload.provider ?? null,
-        vin: payload.vin ?? null,
-        registrationNumber: payload.registrationNumber ?? null,
-        firstRegistrationDate: parseDate(payload.firstRegistrationDate),
-        fuelType: payload.fuelType ?? null,
-        transmission: payload.transmission ?? null,
-        bodyType: payload.bodyType ?? null,
-        driveType: payload.driveType ?? null,
-        power: payload.power ?? null,
-        seats: parseNumber(payload.seats),
-        doors: parseNumber(payload.doors),
-        descriptionDetails: parseDescriptionDetails(payload.descriptionDetails) ?? undefined,
-        images: {
-          deleteMany: {},
-          create: normalizeImages(payload.images).map((image) => ({
-            url: image.url,
-            order: image.order,
-          })),
-        },
+        displayId: body.displayId,
+        make: body.make,
+        model: body.model,
+        year: Number(body.year),
+        mileage: Number(body.mileage),
+        price: parseNumber(body.price),
+        location: body.location ?? null,
+        description: body.description ?? null,
+        descriptionDetails,
+        auctionStart,
+        auctionEnd,
+        provider: body.provider ?? null,
+        vin: body.vin ?? null,
+        registrationNumber: body.registrationNumber ?? null,
+        firstRegistrationDate: parseDate(body.firstRegistrationDate),
+        fuelType: body.fuelType ?? null,
+        transmission: body.transmission ?? null,
+        bodyType: body.bodyType ?? null,
+        driveType: body.driveType ?? null,
+        power: body.power ?? null,
+        seats: parseNumber(body.seats),
+        doors: parseNumber(body.doors),
       },
-      include: { images: { orderBy: { order: "asc" } }, offers: true },
+      include: { images: { orderBy: { order: "asc" } } },
     });
-    res.json(car);
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
-      return res.status(404).json({ error: "Nie znaleziono pojazdu" });
+
+    await prisma.carImage.deleteMany({ where: { carId: id } });
+
+    const incomingImages = normalizeImages(body.images);
+    if (incomingImages.length > 0) {
+      await prisma.carImage.createMany({
+        data: incomingImages.map((img) => ({ carId: id, url: img.url, order: img.order })),
+      });
     }
-    console.error("Nie udało się zaktualizować pojazdu", error);
-    res.status(500).json({ error: "Nie udało się zaktualizować pojazdu" });
+
+    const withImages = await prisma.car.findUnique({
+      where: { id },
+      include: { images: { orderBy: { order: "asc" } } },
+    });
+
+    invalidateListCaches();
+    res.json(withImages ?? updated);
+  } catch (error) {
+    console.error("Błąd aktualizacji pojazdu:", error);
+    res.status(400).json({ error: "Nie udało się zaktualizować pojazdu" });
   }
 });
 
 r.delete("/:id", auth("ADMIN"), async (req: Request, res: Response) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) {
-    return res.status(400).json({ error: "Nieprawidłowe ID pojazdu" });
+    return res.status(400).json({ error: "Nieprawidłowe ID" });
   }
 
   try {
+    await prisma.carImage.deleteMany({ where: { carId: id } });
+    await prisma.offer.deleteMany({ where: { carId: id } });
     await prisma.car.delete({ where: { id } });
-    res.json({ ok: true });
+    invalidateListCaches();
+    res.status(204).send();
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
-      return res.status(404).json({ error: "Pojazd nie istnieje" });
-    }
-    console.error("Nie udało się usunąć pojazdu", error);
-    res.status(500).json({ error: "Nie udało się usunąć pojazdu" });
+    console.error("Błąd usuwania pojazdu:", error);
+    res.status(400).json({ error: "Nie udało się usunąć pojazdu" });
   }
 });
 
