@@ -200,6 +200,7 @@ export const resources = {
         },
       },
       home: {
+        logoutSuccess: "Zostałeś poprawnie wylogowany.",
         hero: {
           tagline: "import premium",
           title: "Import pojazdów prosto ze Szwajcarii",
@@ -1219,6 +1220,7 @@ export const resources = {
         },
       },
       home: {
+        logoutSuccess: "You have been logged out successfully.",
         hero: {
           tagline: "premium import",
           title: "Vehicle import straight from Switzerland",
@@ -2236,6 +2238,7 @@ export const resources = {
         },
       },
       home: {
+        logoutSuccess: "Sie wurden erfolgreich abgemeldet.",
         hero: {
           tagline: "premium import",
           title: "Fahrzeugimport direkt aus der Schweiz",

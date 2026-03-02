@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { useTranslation } from "react-i18next";
 
@@ -58,10 +58,13 @@ const dedupeCars = (cars: Car[]) => {
 export default function Home() {
   const { cars, replaceBaseCars } = useInventory();
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState<boolean>(false);
   const [isBackgroundLoading, setIsBackgroundLoading] = useState<boolean>(false);
   const [errorKey, setErrorKey] = useState<MessageKey>(null);
   const [statusMessageKey, setStatusMessageKey] = useState<MessageKey>(null);
+  const [logoutMessageKey, setLogoutMessageKey] = useState<MessageKey>(null);
   const [usingSampleData, setUsingSampleData] = useState<boolean>(
     () => cars.length === 0 || cars.every((car) => (car.source ?? "").toLowerCase() === "sample")
   );
@@ -95,6 +98,14 @@ export default function Home() {
   }, [provider, searchTerm, sort, yearFrom, yearTo]);
 
   const queryKey = useMemo(() => nextSearchParams.toString() || "__default__", [nextSearchParams]);
+
+  useEffect(() => {
+    const state = location.state as { logoutSuccess?: unknown } | null;
+    if (!state?.logoutSuccess) return;
+
+    setLogoutMessageKey("home.logoutSuccess");
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: {} });
+  }, [location.pathname, location.search, location.state, navigate]);
 
   useEffect(() => {
     if (nextSearchParams.toString() === searchParams.toString()) return;
@@ -401,6 +412,10 @@ export default function Home() {
             </label>
           </div>
         </div>
+
+        {logoutMessageKey && (
+          <p className="rounded-3xl bg-emerald-50 px-6 py-4 text-sm font-medium text-emerald-700 shadow-sm">{t(logoutMessageKey)}</p>
+        )}
 
         {statusMessageKey && (
           <p className="rounded-3xl bg-amber-50 px-6 py-4 text-sm font-medium text-amber-700 shadow-sm">{t(statusMessageKey)}</p>

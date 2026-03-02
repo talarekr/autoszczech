@@ -62,7 +62,7 @@ r.post("/login", async (req: Request, res: Response) => {
   const token = jwt.sign({ id: user.id, email: user.email, role: tokenRole }, JWT_SECRET, {
     expiresIn: "7d",
   });
-  res.json({ token, role: tokenRole, email: user.email });
+  res.json({ token, role: tokenRole, email: user.email, firstName: user.firstName, lastName: user.lastName });
 });
 
 r.get("/me", auth("USER"), async (req: AuthReq, res: Response) => {
@@ -72,7 +72,7 @@ r.get("/me", auth("USER"), async (req: AuthReq, res: Response) => {
       return res.status(404).json({ error: "Użytkownik nie istnieje" });
     }
 
-    res.json({ id: user.id, email: user.email, role: user.role, createdAt: user.createdAt });
+    res.json({ id: user.id, email: user.email, role: user.role, firstName: user.firstName, lastName: user.lastName, createdAt: user.createdAt });
   } catch (error) {
     console.error("Nie udało się pobrać profilu użytkownika", error);
     res.status(500).json({ error: "Nie udało się pobrać profilu" });
