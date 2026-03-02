@@ -56,11 +56,11 @@ LIMIT 24 OFFSET 0;
 - Bez poprawnego SPF/DKIM/DMARC serwery odbiorców mogą odrzucać lub cicho filtrować wiadomości mimo przyjęcia przez serwer SMTP.
 
 ## 4) Automatyczny import JSON + zdjęć z zewnętrznego FTP
-- Watcher działa domyślnie (`FTP_IMPORT_ENABLED=true`) i co 30 minut sprawdza katalog `uploads/json` na serwerze `hosting2580517.online.pro` (login `hosting2580517`, hasło `autoszczech12!!`).
+- Watcher działa domyślnie (`FTP_IMPORT_ENABLED=true`) i co 30 minut sprawdza katalog `uploads/json` na zewnętrznym serwerze FTP (host/login/hasło ustawiane przez zmienne środowiskowe).
 - Do działania wymagany jest `curl` (Render/Linux mają go preinstalowanego). Każdy plik `.json` jest pobierany, analizowany i – jeżeli suma kontrolna SHA-256 zmieniła się – importowany jako nowa lub zaktualizowana aukcja.
 - Podczas importu dla każdej oferty pobierane są również zdjęcia z katalogu `uploads/images`. Pliki trafiają lokalnie do `storage/ftp-images/<ID_AUKCJI>/`, a backend udostępnia je pod adresem `http(s)://.../uploads/ftp/...`. Dzięki temu frontend otrzymuje gotowe, publiczne URL-e obrazków.
 - Historia importów zapisywana jest w tabeli `ImportJob` (łącznie z błędami parsowania), aby łatwo sprawdzić, które pliki zostały przetworzone.
-- W razie potrzeby możesz ręcznie wyzwolić pojedynczy cykl importu oraz podejrzeć ostatni wynik: `POST /api/admin/ftp/run` (lub `GET /api/admin/ftp/status`). Endpoints wymagają tokenu admina (np. zaloguj się na `talarekr@gmail.com` / `ChangeMe123!`, pobierz token JWT i dodaj nagłówek `Authorization: Bearer <token>`).
+- W razie potrzeby możesz ręcznie wyzwolić pojedynczy cykl importu oraz podejrzeć ostatni wynik: `POST /api/admin/ftp/run` (lub `GET /api/admin/ftp/status`). Endpoints wymagają tokenu admina (zaloguj się kontem administracyjnym, pobierz token JWT i dodaj nagłówek `Authorization: Bearer <token>`).
 - Najważniejsze zmienne środowiskowe (jeśli chcesz zmienić domyślne wartości):
   - `FTP_HOST`, `FTP_PORT`, `FTP_USER`, `FTP_PASSWORD` – dane logowania do zewnętrznego FTP.
   - `FTP_JSON_DIRECTORY` – katalog z plikami `.json` (domyślnie `uploads/json`).
@@ -132,7 +132,7 @@ Skrypt utworzy tymczasową gałąź z pojedynczym commitem i wykona `git push --
 > **Uwaga:** przed uruchomieniem upewnij się, że drzewo robocze jest czyste (`git status --porcelain`) oraz że masz uprawnienia do wymuszonego pushowania do `main`.
 
 ## Dane logowania administratora
-- **E-mail:** talarekr@gmail.com
-- **Hasło:** ChangeMe123! (z seed) — zmień po 1. logowaniu
+- **E-mail:** wartość zmiennej `ADMIN_EMAIL`
+- **Hasło:** wartość zmiennej `ADMIN_PASSWORD` (z seed) — ustaw silne hasło i zmień po 1. logowaniu
 - **Panel:** `/admin`
 - Formularz logowania na froncie łączy się bezpośrednio z API i zapisuje token JWT (przechowywany w localStorage tylko przy zaznaczeniu „Zapamiętaj mnie”). Panel administracyjny wciąż posiada ręczny importer, ale domyślnie oferty spływają automatycznie z FTP – ręczne wgrywanie JSON-ów jest potrzebne tylko awaryjnie.

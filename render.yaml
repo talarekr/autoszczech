@@ -14,7 +14,7 @@ services:
           name: autoszczech-db
           property: connectionString
       - key: JWT_SECRET
-        value: superSekretnyKlucz
+        value: change-me-in-render
       - key: PORT
         value: "10000"
       - key: PUBLIC_BACKEND_URL
@@ -22,13 +22,13 @@ services:
       - key: FTP_IMPORT_ENABLED
         value: "true"
       - key: FTP_HOST
-        value: hosting2580517.online.pro
+        value: ftp.example.com
       - key: FTP_PORT
         value: "21"
       - key: FTP_USER
-        value: hosting2580517
+        value: your-ftp-user
       - key: FTP_PASSWORD
-        value: autoszczech12!!
+        value: your-ftp-password
       - key: FTP_JSON_DIRECTORY
         value: uploads/json
       - key: FTP_IMAGE_DIRECTORY

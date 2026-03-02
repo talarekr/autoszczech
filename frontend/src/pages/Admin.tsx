@@ -55,6 +55,9 @@ export default function Admin() {
   const [clientsError, setClientsError] = useState<string | null>(null);
   const [approvingUserId, setApprovingUserId] = useState<number | null>(null);
   const [rejectingUserId, setRejectingUserId] = useState<number | null>(null);
+  const [wonAuctions, setWonAuctions] = useState<WonAuction[]>([]);
+  const [wonAuctionsLoading, setWonAuctionsLoading] = useState(false);
+  const [wonAuctionsError, setWonAuctionsError] = useState<string | null>(null);
 
   const isAdmin = isLoggedIn && userRole === "ADMIN";
 
@@ -497,6 +500,32 @@ export default function Admin() {
       setClientsError(t("admin.clients.rejectError"));
     } finally {
       setRejectingUserId(null);
+    }
+  };
+
+  const fetchWonAuctions = async () => {
+    if (!token || !isAdmin) {
+      setWonAuctionsError(t("admin.wonAuctions.authRequired"));
+      setWonAuctions([]);
+      return;
+    }
+
+    setWonAuctionsLoading(true);
+    setWonAuctionsError(null);
+
+    try {
+      const apiUrl = await getApiUrl();
+      const response = await axios.get<{ wonAuctions: WonAuction[] }>(`${apiUrl}/api/admin/won-auctions`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setWonAuctions(response.data.wonAuctions ?? []);
+    } catch (err) {
+      console.error("Nie udało się pobrać aukcji wygranych", err);
+      setWonAuctionsError(t("admin.wonAuctions.loadError"));
+      setWonAuctions([]);
+    } finally {
+      setWonAuctionsLoading(false);
     }
   };
 
