@@ -203,6 +203,7 @@ export const resources = {
         hero: {
           tagline: "import premium",
           title: "Import pojazdów prosto ze Szwajcarii",
+          subtitle: "Wyszukaj oferty samochodów, motocykli i pojazdów specjalnych od zaufanych partnerów ze Szwajcarii",
           description: "Wyszukaj oferty samochodów, motocykli i pojazdów specjalnych od zaufanych partnerów z całej Europy.",
           points: {
             access: "Dostęp do aukcji 24/7",
@@ -213,7 +214,9 @@ export const resources = {
         search: {
           badge: "Wyszukiwarka ofert",
           title: "Znajdź wymarzony pojazd",
+          query: "Szukaj frazy, np. marka samochodu",
           queryLabel: "Szukaj frazy, np. marka samochodu",
+          placeholder: "np. Audi A4",
           queryPlaceholder: "np. Audi A4",
           yearFrom: "Rok produkcji od",
           yearTo: "Rok produkcji do",
@@ -1216,6 +1219,8 @@ export const resources = {
         hero: {
           tagline: "premium import",
           title: "Vehicle import straight from Switzerland",
+          subtitle:
+            "Browse offers for cars, motorcycles and special vehicles from trusted partners in Switzerland.",
           description:
             "Browse offers for cars, motorcycles and special vehicles from trusted partners across Europe.",
           points: {
@@ -1227,7 +1232,9 @@ export const resources = {
         search: {
           badge: "Offer search",
           title: "Find your perfect vehicle",
+          query: "Search phrase, e.g. vehicle make",
           queryLabel: "Search phrase, e.g. vehicle make",
+          placeholder: "e.g. Audi A4",
           queryPlaceholder: "e.g. Audi A4",
           yearFrom: "Production year from",
           yearTo: "Production year to",
@@ -2226,6 +2233,8 @@ export const resources = {
         hero: {
           tagline: "premium import",
           title: "Fahrzeugimport direkt aus der Schweiz",
+          subtitle:
+            "Finden Sie Angebote für Autos, Motorräder und Spezialfahrzeuge von vertrauenswürdigen Partnern in der Schweiz.",
           description:
             "Finden Sie Angebote für Autos, Motorräder und Spezialfahrzeuge von vertrauenswürdigen Partnern in ganz Europa.",
           points: {
@@ -2237,7 +2246,9 @@ export const resources = {
         search: {
           badge: "Angebotssuche",
           title: "Finden Sie Ihr Wunschfahrzeug",
+          query: "Suchbegriff, z. B. Automarke",
           queryLabel: "Suchbegriff, z. B. Automarke",
+          placeholder: "z. B. Audi A4",
           queryPlaceholder: "z. B. Audi A4",
           yearFrom: "Baujahr ab",
           yearTo: "Baujahr bis",

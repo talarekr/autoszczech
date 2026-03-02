@@ -1,5 +1,6 @@
 import { mkdirSync } from "node:fs";
 import path from "node:path";
+import { gzipSync } from "node:zlib";
 
 import express from "express";
 import cors from "cors";
@@ -21,6 +22,32 @@ import { RegistrationStatus } from "@prisma/client";
 import { ADMIN_EMAILS, normalizeAdminEmail } from "./lib/adminAccess.js";
 
 const app = express();
+
+app.use((req, res, next) => {
+  const originalJson = res.json.bind(res);
+  res.json = (body: unknown) => {
+    const acceptedEncoding = req.headers["accept-encoding"] ?? "";
+    const acceptsGzip = typeof acceptedEncoding === "string" && acceptedEncoding.includes("gzip");
+
+    if (!acceptsGzip) {
+      return originalJson(body);
+    }
+
+    const payload = Buffer.from(JSON.stringify(body));
+    if (payload.length < 1024) {
+      return originalJson(body);
+    }
+
+    const compressed = gzipSync(payload);
+    res.setHeader("Content-Encoding", "gzip");
+    res.setHeader("Vary", "Accept-Encoding");
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("Content-Length", String(compressed.length));
+    return res.status(res.statusCode || 200).send(compressed);
+  };
+
+  return next();
+});
 app.use(express.json());
 app.use(cors({ origin: true, credentials: true }));
 app.use(helmet());
