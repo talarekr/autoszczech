@@ -1,6 +1,6 @@
 import axios from "axios";
 import { FormEvent, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../contexts/AuthContext";
@@ -41,8 +41,24 @@ export default function Login() {
   const [showReset, setShowReset] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
   const { t } = useTranslation();
+
+  const redirectTarget = (() => {
+    const stateFrom = (location.state as { from?: unknown } | null)?.from;
+    if (typeof stateFrom === "string" && stateFrom.startsWith("/")) {
+      return stateFrom;
+    }
+
+    const queryFrom = new URLSearchParams(location.search).get("redirect");
+    if (typeof queryFrom === "string" && queryFrom.startsWith("/")) {
+      return queryFrom;
+    }
+
+    return "/";
+  })();
+
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -65,7 +81,7 @@ export default function Login() {
       await login({ email, password, remember: form.remember });
       setSuccessKey("login.success");
       setTimeout(() => {
-        navigate("/", { replace: true });
+        navigate(redirectTarget, { replace: true });
       }, 1000);
     } catch (error) {
       if (error instanceof Error && "translationKey" in error) {

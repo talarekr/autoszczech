@@ -178,4 +178,73 @@ r.patch("/users/:id/approve", auth("ADMIN"), async (req: Request, res: Response)
   }
 });
 
+
+r.delete("/users/:id/reject", auth("ADMIN"), async (req: Request, res: Response) => {
+  const userId = Number(req.params.id);
+  if (!Number.isFinite(userId)) return res.status(400).json({ error: "Nieprawidłowe ID użytkownika" });
+
+  try {
+    const existing = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, registrationStatus: true },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: "Użytkownik nie istnieje" });
+    }
+
+    if (existing.registrationStatus !== RegistrationStatus.PENDING) {
+      return res.status(400).json({ error: "Odrzucić można tylko oczekujące zgłoszenia" });
+    }
+
+    await prisma.user.delete({ where: { id: userId } });
+
+    res.json({ id: userId, rejected: true });
+  } catch (error) {
+    console.error("Nie udało się odrzucić zgłoszenia użytkownika", error);
+    res.status(500).json({ error: "Nie udało się odrzucić zgłoszenia użytkownika" });
+  }
+});
+
+r.get("/won-auctions", auth("ADMIN"), async (_req: Request, res: Response) => {
+  try {
+    const cars = await prisma.car.findMany({
+      where: {
+        offers: {
+          some: {
+            winnerStatus: "AWARDED",
+            isWinner: true,
+          },
+        },
+      },
+      include: {
+        images: { orderBy: { order: "asc" } },
+        offers: {
+          where: {
+            winnerStatus: "AWARDED",
+            isWinner: true,
+          },
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        },
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+
+    res.json({ cars });
+  } catch (error) {
+    console.error("Nie udało się pobrać aukcji wygranych", error);
+    res.status(500).json({ error: "Nie udało się pobrać aukcji wygranych" });
+  }
+});
+
 export default r;

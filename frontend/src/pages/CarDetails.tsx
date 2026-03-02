@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import type React from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { useTranslation } from "react-i18next";
 
@@ -77,6 +77,8 @@ export default function CarDetails() {
   const { findCarByIdentifier } = useInventory();
   const { t, i18n } = useTranslation();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const loginRedirectState = { from: `${location.pathname}${location.search}` };
   const swipeHandledRef = useRef(false);
   const lightboxSwipeHandledRef = useRef(false);
 
@@ -682,7 +684,7 @@ export default function CarDetails() {
               {!isLoggedIn && !favoriteFeedback && (
                 <p className="mt-4 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
                   {t("carDetails.favorites.loginHint")} {" "}
-                  <Link to="/login" className="font-semibold text-red-600 underline underline-offset-4">
+                  <Link to="/login" state={loginRedirectState} className="font-semibold text-red-600 underline underline-offset-4">
                     {t("carDetails.favorites.loginLink")}
                   </Link>
                   .
@@ -740,7 +742,7 @@ export default function CarDetails() {
                         <p className="font-semibold">{t("carDetails.loginRequired.title")}</p>
                         <p>
                           {t("carDetails.loginRequired.message")} {" "}
-                          <Link to="/login" className="font-semibold text-red-600 underline underline-offset-4">
+                          <Link to="/login" state={loginRedirectState} className="font-semibold text-red-600 underline underline-offset-4">
                             {t("carDetails.loginRequired.loginLink")}
                           </Link>{" "}
                           {t("carDetails.loginRequired.afterLoginLink")} {" "}
