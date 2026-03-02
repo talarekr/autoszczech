@@ -10,6 +10,26 @@ import type { AdminUser } from "../types/user";
 
 type AdminOffer = CarOffer & { user?: { id: number; email: string } };
 type AdminCar = Car & { offers: AdminOffer[] };
+type WonAuction = {
+  id: number;
+  displayId?: string | null;
+  make?: string | null;
+  model?: string | null;
+  provider?: string | null;
+  auctionEnd?: string | null;
+  winnerOffer: {
+    id: number;
+    amount: number;
+    createdAt?: string | null;
+    userId: number;
+    user?: {
+      id: number;
+      email: string;
+      firstName?: string | null;
+      lastName?: string | null;
+    } | null;
+  };
+};
 
 type WinnerButtonState = {
   carId: number;
@@ -23,7 +43,7 @@ const statusTone: Record<WinnerStatus, string> = {
 };
 
 const insurersFallback = ["AXA", "ALLIANZ", "SCC", "BEST", "REST"];
-type AdminSection = "AUCTIONS" | "CLIENTS";
+type AdminSection = "AUCTIONS" | "CLIENTS" | "WON_AUCTIONS";
 
 export default function Admin() {
   const { t } = useTranslation();
@@ -51,6 +71,10 @@ export default function Admin() {
   const [clientsLoading, setClientsLoading] = useState(false);
   const [clientsError, setClientsError] = useState<string | null>(null);
   const [approvingUserId, setApprovingUserId] = useState<number | null>(null);
+  const [rejectingUserId, setRejectingUserId] = useState<number | null>(null);
+  const [wonAuctions, setWonAuctions] = useState<WonAuction[]>([]);
+  const [wonAuctionsLoading, setWonAuctionsLoading] = useState(false);
+  const [wonAuctionsError, setWonAuctionsError] = useState<string | null>(null);
 
   const isAdmin = isLoggedIn && userRole === "ADMIN";
 
@@ -299,21 +323,69 @@ export default function Admin() {
     searchClients({ forceAll: true });
   };
 
-  const handleClearDateFilter = () => {
-    setClientsDateFrom("");
-    setClientsDateTo("");
+  const handleExportClientsCsv = () => {
+    if (!clientsDateFrom && !clientsDateTo) return;
 
-    if (showAllClients) {
-      searchClients({ forceAll: true });
-      return;
-    }
+    const formKeys = Array.from(
+      new Set(
+        searchedUsers.flatMap((user) =>
+          user.registrationForm && typeof user.registrationForm === "object"
+            ? Object.keys(user.registrationForm)
+            : []
+        )
+      )
+    );
 
-    if (clientSearch.trim()) {
-      searchClients();
-      return;
-    }
+    const headers = [
+      "id",
+      "email",
+      "firstName",
+      "lastName",
+      "registrationStatus",
+      "createdAt",
+      ...formKeys,
+    ];
 
-    setSearchedUsers([]);
+    const escapeValue = (value: unknown) => {
+      if (value === null || value === undefined) return "";
+      const stringValue =
+        typeof value === "object" ? JSON.stringify(value) : String(value);
+      return `"${stringValue.replace(/"/g, '""')}"`;
+    };
+
+    const rows = searchedUsers.map((user) => {
+      const baseValues = [
+        user.id,
+        user.email,
+        user.firstName ?? "",
+        user.lastName ?? "",
+        user.registrationStatus ?? "",
+        user.createdAt,
+      ];
+
+      const formValues = formKeys.map((key) => {
+        if (!user.registrationForm || typeof user.registrationForm !== "object") {
+          return "";
+        }
+        return user.registrationForm[key as keyof typeof user.registrationForm] ?? "";
+      });
+
+      return [...baseValues, ...formValues].map(escapeValue).join(",");
+    });
+
+    const csvContent = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    const from = clientsDateFrom || "all";
+    const to = clientsDateTo || "all";
+
+    link.href = url;
+    link.setAttribute("download", `clients-${from}-to-${to}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   useEffect(() => {
@@ -337,6 +409,12 @@ export default function Admin() {
   useEffect(() => {
     if (activeSection !== "CLIENTS") return;
     fetchPendingUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSection, token, isAdmin]);
+
+  useEffect(() => {
+    if (activeSection !== "WON_AUCTIONS") return;
+    fetchWonAuctions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSection, token, isAdmin]);
 
@@ -421,6 +499,53 @@ export default function Admin() {
     }
   };
 
+  const handleRejectUser = async (userId: number) => {
+    if (!token || !isAdmin) return;
+    setRejectingUserId(userId);
+    setClientsError(null);
+
+    try {
+      const apiUrl = await getApiUrl();
+      await axios.delete(`${apiUrl}/api/admin/users/${userId}/reject`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setPendingUsers((prev) => prev.filter((user) => user.id !== userId));
+      setSearchedUsers((prev) => prev.filter((user) => user.id !== userId));
+    } catch (err) {
+      console.error("Nie udało się odrzucić użytkownika", err);
+      setClientsError(t("admin.clients.rejectError"));
+    } finally {
+      setRejectingUserId(null);
+    }
+  };
+
+  const fetchWonAuctions = async () => {
+    if (!token || !isAdmin) {
+      setWonAuctionsError(t("admin.wonAuctions.authRequired"));
+      setWonAuctions([]);
+      return;
+    }
+
+    setWonAuctionsLoading(true);
+    setWonAuctionsError(null);
+
+    try {
+      const apiUrl = await getApiUrl();
+      const response = await axios.get<{ wonAuctions: WonAuction[] }>(`${apiUrl}/api/admin/won-auctions`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setWonAuctions(response.data.wonAuctions ?? []);
+    } catch (err) {
+      console.error("Nie udało się pobrać aukcji wygranych", err);
+      setWonAuctionsError(t("admin.wonAuctions.loadError"));
+      setWonAuctions([]);
+    } finally {
+      setWonAuctionsLoading(false);
+    }
+  };
+
   const visibleAuctions = useMemo(() => {
     if (activeSection !== "AUCTIONS") return [] as AdminCar[];
     return auctions.filter((auction) => auction.offers && auction.offers.length > 0);
@@ -483,11 +608,29 @@ export default function Admin() {
             >
               {t("admin.clients.tab")}
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveSection("WON_AUCTIONS");
+                setExpandedAuction(null);
+              }}
+              className={`rounded-full px-4 py-2 text-sm font-semibold shadow-sm ring-1 transition ${
+                activeSection === "WON_AUCTIONS"
+                  ? "bg-neutral-900 text-white ring-neutral-800"
+                  : "bg-white text-neutral-700 ring-neutral-200 hover:bg-red-50 hover:text-red-700"
+              }`}
+            >
+              {t("admin.wonAuctions.tab")}
+            </button>
           </div>
           <button
             type="button"
             onClick={() =>
-              activeSection === "AUCTIONS" ? fetchAuctions(activeInsurer) : fetchPendingUsers()
+              activeSection === "AUCTIONS"
+                ? fetchAuctions(activeInsurer)
+                : activeSection === "CLIENTS"
+                  ? fetchPendingUsers()
+                  : fetchWonAuctions()
             }
             className="ml-auto inline-flex items-center justify-center rounded-full bg-neutral-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-neutral-800"
           >
@@ -643,7 +786,7 @@ export default function Admin() {
               </div>
             )}
           </>
-        ) : (
+        ) : activeSection === "CLIENTS" ? (
           <div className="space-y-4">
             {clientsError && <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{clientsError}</div>}
             <div className="grid gap-4 lg:grid-cols-2">
@@ -683,16 +826,28 @@ export default function Admin() {
                             <p className="text-sm text-neutral-700">{user.email}</p>
                             <p className="text-xs text-neutral-500">{formatDateTime(user.createdAt)}</p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleApproveUser(user.id)}
-                            disabled={approvingUserId === user.id}
-                            className="shrink-0 rounded-full bg-emerald-600 px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-70"
-                          >
-                            {approvingUserId === user.id
-                              ? t("admin.clients.approving")
-                              : t("admin.clients.approve")}
-                          </button>
+                          <div className="flex shrink-0 items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleApproveUser(user.id)}
+                              disabled={approvingUserId === user.id || rejectingUserId === user.id}
+                              className="rounded-full bg-emerald-600 px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-70"
+                            >
+                              {approvingUserId === user.id
+                                ? t("admin.clients.approving")
+                                : t("admin.clients.approve")}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRejectUser(user.id)}
+                              disabled={rejectingUserId === user.id || approvingUserId === user.id}
+                              className="rounded-full bg-neutral-700 px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white shadow-sm transition hover:bg-neutral-800 disabled:opacity-70"
+                            >
+                              {rejectingUserId === user.id
+                                ? t("admin.clients.rejecting")
+                                : t("admin.clients.reject")}
+                            </button>
+                          </div>
                         </div>
                         {buildUserDetails(user).length > 0 ? (
                           <dl className="grid gap-1 text-xs text-neutral-700 sm:grid-cols-2">
@@ -777,10 +932,11 @@ export default function Admin() {
                       </button>
                       <button
                         type="button"
-                        onClick={handleClearDateFilter}
-                        className="rounded-full border border-neutral-300 bg-white px-5 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-neutral-700 shadow-sm transition hover:bg-neutral-100"
+                        onClick={handleExportClientsCsv}
+                        disabled={clientsLoading || searchedUsers.length === 0 || (!clientsDateFrom && !clientsDateTo)}
+                        className="whitespace-nowrap rounded-full border border-neutral-300 bg-white px-5 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-neutral-700 shadow-sm transition hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        {t("admin.clients.clearDateCta")}
+                        {t("admin.clients.exportCsvCta")}
                       </button>
                     </div>
                   </div>
@@ -853,6 +1009,49 @@ export default function Admin() {
                 )}
               </div>
             </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {wonAuctionsError && <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{wonAuctionsError}</div>}
+            {wonAuctionsLoading ? (
+              <div className="rounded-2xl border border-dashed border-neutral-200 bg-neutral-50 p-6 text-center text-neutral-600">
+                {t("admin.wonAuctions.loading")}
+              </div>
+            ) : wonAuctions.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-neutral-200 bg-neutral-50 p-6 text-center text-neutral-600">
+                {t("admin.wonAuctions.empty")}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {wonAuctions.map((auction) => {
+                  const winner = auction.winnerOffer;
+                  const winnerName = [winner.user?.firstName, winner.user?.lastName].filter(Boolean).join(" ") || t("admin.clients.unknownName");
+                  return (
+                    <article key={auction.id} className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">
+                            ID: {auction.displayId ?? auction.id}
+                          </p>
+                          <h3 className="text-lg font-semibold text-neutral-900">{auction.make ?? "—"} {auction.model ?? ""}</h3>
+                          <p className="text-sm text-neutral-600">{auction.provider ?? "—"} · {formatDateTime(auction.auctionEnd)}</p>
+                        </div>
+                        <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-800 ring-1 ring-emerald-200">
+                          {t("admin.bids.status.AWARDED")}
+                        </span>
+                      </div>
+
+                      <div className="rounded-xl bg-neutral-50 p-3 text-sm text-neutral-700">
+                        <p><span className="font-semibold">{t("admin.wonAuctions.winner")}: </span>{winnerName}</p>
+                        <p><span className="font-semibold">{t("admin.wonAuctions.winnerEmail")}: </span>{winner.user?.email ?? `ID: ${winner.userId}`}</p>
+                        <p><span className="font-semibold">{t("admin.wonAuctions.winningBid")}: </span>{formatCurrency(winner.amount)}</p>
+                        <p><span className="font-semibold">{t("admin.wonAuctions.awardedAt")}: </span>{formatDateTime(winner.createdAt)}</p>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </section>

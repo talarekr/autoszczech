@@ -178,4 +178,93 @@ r.patch("/users/:id/approve", auth("ADMIN"), async (req: Request, res: Response)
   }
 });
 
+
+r.delete("/users/:id/reject", auth("ADMIN"), async (req: Request, res: Response) => {
+  const userId = Number(req.params.id);
+  if (!Number.isFinite(userId)) return res.status(400).json({ error: "Nieprawidłowe ID użytkownika" });
+
+  try {
+    const existing = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, registrationStatus: true },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: "Użytkownik nie istnieje" });
+    }
+
+    if (existing.registrationStatus !== RegistrationStatus.PENDING) {
+      return res.status(400).json({ error: "Odrzucić można tylko oczekujące zgłoszenia" });
+    }
+
+    await prisma.user.delete({ where: { id: userId } });
+
+    res.json({ id: userId, rejected: true });
+  } catch (error) {
+    console.error("Nie udało się odrzucić zgłoszenia użytkownika", error);
+    res.status(500).json({ error: "Nie udało się odrzucić zgłoszenia użytkownika" });
+  }
+});
+
+r.get("/won-auctions", auth("ADMIN"), async (_req: Request, res: Response) => {
+  try {
+    const cars = await prisma.car.findMany({
+      where: {
+        offers: {
+          some: {
+            winnerStatus: "AWARDED",
+          },
+        },
+      },
+      include: {
+        offers: {
+          where: {
+            winnerStatus: "AWARDED",
+          },
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        },
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+
+    const wonAuctions = cars
+      .map((car) => {
+        const winnerOffer = car.offers.find((offer) => offer.winnerStatus === "AWARDED") ?? null;
+        if (!winnerOffer) return null;
+
+        return {
+          id: car.id,
+          displayId: car.displayId,
+          make: car.make,
+          model: car.model,
+          provider: car.provider,
+          auctionEnd: car.auctionEnd,
+          winnerOffer: {
+            id: winnerOffer.id,
+            amount: winnerOffer.amount,
+            createdAt: winnerOffer.createdAt,
+            userId: winnerOffer.userId,
+            user: winnerOffer.user,
+          },
+        };
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+
+    res.json({ wonAuctions });
+  } catch (error) {
+    console.error("Nie udało się pobrać aukcji wygranych", error);
+    res.status(500).json({ error: "Nie udało się pobrać aukcji wygranych" });
+  }
+});
+
 export default r;

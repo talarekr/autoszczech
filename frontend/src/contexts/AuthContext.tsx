@@ -9,6 +9,8 @@ interface Session {
   token: string | null;
   email: string | null;
   role: UserRole;
+  firstName: string | null;
+  lastName: string | null;
 }
 
 interface LoginCredentials {
@@ -21,6 +23,8 @@ interface AuthContextValue {
   isLoggedIn: boolean;
   userEmail: string | null;
   userRole: UserRole;
+  userFirstName: string | null;
+  userLastName: string | null;
   token: string | null;
   login: (credentials: LoginCredentials) => Promise<void>;
   logout: () => void;
@@ -44,22 +48,24 @@ class AuthError extends Error {
 
 const readStoredSession = (): Session => {
   if (typeof window === "undefined") {
-    return { token: null, email: null, role: null };
+    return { token: null, email: null, role: null, firstName: null, lastName: null };
   }
 
   try {
     const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
     if (!raw) {
-      return { token: null, email: null, role: null };
+      return { token: null, email: null, role: null, firstName: null, lastName: null };
     }
     const parsed = JSON.parse(raw);
     const token = typeof parsed.token === "string" ? parsed.token : null;
     const email = typeof parsed.email === "string" ? parsed.email : null;
     const role = parsed.role === "ADMIN" || parsed.role === "USER" ? parsed.role : null;
-    return { token, email, role };
+    const firstName = typeof parsed.firstName === "string" ? parsed.firstName : null;
+    const lastName = typeof parsed.lastName === "string" ? parsed.lastName : null;
+    return { token, email, role, firstName, lastName };
   } catch (error) {
     console.warn("Nie udało się odczytać sesji użytkownika z localStorage.", error);
-    return { token: null, email: null, role: null };
+    return { token: null, email: null, role: null, firstName: null, lastName: null };
   }
 };
 
@@ -94,6 +100,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           token: string;
           role?: string;
           email?: string;
+          firstName?: string | null;
+          lastName?: string | null;
         }>(`${apiUrl}/api/auth/login`, {
           email: trimmedEmail,
           password,
@@ -109,6 +117,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           token,
           email: response.data?.email ?? trimmedEmail,
           role,
+          firstName: response.data?.firstName ?? null,
+          lastName: response.data?.lastName ?? null,
         };
 
         setSession(nextSession);
@@ -137,7 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(() => {
-    setSession({ token: null, email: null, role: null });
+    setSession({ token: null, email: null, role: null, firstName: null, lastName: null });
     persistSession(null);
   }, []);
 
@@ -158,6 +168,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoggedIn: Boolean(session.token),
       userEmail: session.email,
       userRole: session.role,
+      userFirstName: session.firstName,
+      userLastName: session.lastName,
       token: session.token,
       login,
       logout,

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Outlet, NavLink, useLocation } from "react-router-dom";
+import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 
 import { useTranslation } from "react-i18next";
 
@@ -16,7 +16,8 @@ const languageOrder: Array<{ code: string; flag: string }> = [
 ];
 
 export default function App() {
-  const { isLoggedIn, logout } = useAuth();
+  const { isLoggedIn, logout, userFirstName, userLastName, userEmail } = useAuth();
+  const navigate = useNavigate();
   const { t, i18n, ready } = useTranslation();
   const isReady = ready && i18n.isInitialized;
   const [isAuthMenuOpen, setIsAuthMenuOpen] = useState(false);
@@ -29,6 +30,16 @@ export default function App() {
     flag,
     label: `${flag} ${t(`common.languages.${code}`)}`,
   }));
+
+  const userInitials = (() => {
+    const first = userFirstName?.trim().charAt(0) ?? "";
+    const last = userLastName?.trim().charAt(0) ?? "";
+    const initials = `${first}${last}`.toUpperCase();
+
+    if (initials) return initials;
+    if (userEmail) return userEmail.trim().charAt(0).toUpperCase();
+    return "?";
+  })();
 
   if (!isReady) {
     return (
@@ -107,26 +118,32 @@ export default function App() {
                   isAuthMenuOpen ? "border-red-300 bg-red-50 text-red-600" : ""
                 }`}
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  className="h-5 w-5"
-                  aria-hidden
-                >
-                  <path
-                    d="M12 12c2.485 0 4.5-2.015 4.5-4.5S14.485 3 12 3 7.5 5.015 7.5 7.5 9.515 12 12 12Z"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M5 20.4c.87-3.07 3.54-5.15 7-5.15s6.13 2.08 7 5.15"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
+                {isLoggedIn ? (
+                  <span className="text-sm font-semibold uppercase tracking-wide" aria-hidden>
+                    {userInitials}
+                  </span>
+                ) : (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    className="h-5 w-5"
+                    aria-hidden
+                  >
+                    <path
+                      d="M12 12c2.485 0 4.5-2.015 4.5-4.5S14.485 3 12 3 7.5 5.015 7.5 7.5 9.515 12 12 12Z"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M5 20.4c.87-3.07 3.54-5.15 7-5.15s6.13 2.08 7 5.15"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
               </button>
               {isAuthMenuOpen && (
                 <div className="absolute right-0 z-20 mt-3 w-52 overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-lg shadow-black/5">
@@ -148,6 +165,7 @@ export default function App() {
                         onClick={() => {
                           logout();
                           setIsAuthMenuOpen(false);
+                          navigate("/", { state: { logoutSuccess: true } });
                         }}
                         className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-semibold text-neutral-700 transition hover:bg-neutral-50"
                       >
@@ -158,6 +176,7 @@ export default function App() {
                     <>
                       <NavLink
                         to="/login"
+                        state={{ from: `${location.pathname}${location.search}` }}
                         onClick={() => setIsAuthMenuOpen(false)}
                         className={({ isActive }) =>
                           `flex items-center gap-2 px-4 py-3 text-sm font-semibold transition hover:bg-neutral-50 ${
