@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "AutoSzczech",
+    "slug": "autoszczech-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "../frontend/public/logo.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "../frontend/public/logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.autoszczech.mobile"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "../frontend/public/logo.png",
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

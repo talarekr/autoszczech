@@ -98,3 +98,41 @@ Skrypt utworzy tymczasową gałąź z pojedynczym commitem i wykona `git push --
 - **Hasło:** ChangeMe123! (z seed) — zmień po 1. logowaniu
 - **Panel:** `/admin`
 - Formularz logowania na froncie łączy się bezpośrednio z API i zapisuje token JWT (przechowywany w localStorage tylko przy zaznaczeniu „Zapamiętaj mnie”). Panel administracyjny wciąż posiada ręczny importer, ale domyślnie oferty spływają automatycznie z FTP – ręczne wgrywanie JSON-ów jest potrzebne tylko awaryjnie.
+
+## 6) Aplikacja iOS (React Native / Expo)
+W repozytorium został dodany katalog `mobile/` z natywną aplikacją iOS opartą o Expo + React Native.
+
+### Funkcjonalności mobilne
+- Logowanie i rejestracja użytkownika (`/api/auth/login`, `/api/auth/register`)
+- Lista aut (`/api/cars`) + ekran szczegółów (`/api/cars/:id`)
+- Dodawanie/usuwanie ulubionych (`/api/favorites`)
+- Składanie ofert i lista własnych ofert (`/api/offers`, `/api/offers/mine`)
+- Kalkulator CHF → PLN
+- Ekran profilu i wylogowanie
+
+### Uruchomienie na iOS
+1. Zainstaluj zależności:
+   ```bash
+   npm install
+   ```
+2. (Opcjonalnie) ustaw URL backendu:
+   ```bash
+   export EXPO_PUBLIC_API_URL="https://autoszczech-backend.onrender.com"
+   ```
+3. Uruchom aplikację:
+   ```bash
+   npm run ios -w mobile
+   ```
+
+Możesz też uruchomić Metro i zeskanować QR w aplikacji Expo Go:
+```bash
+npm run start -w mobile
+```
+
+
+### Czy to już gotowe do instalacji lokalnie na iPhonie (bez App Store)?
+Tak — **w trybie deweloperskim** projekt jest przygotowany do uruchomienia lokalnego:
+- przez **Expo Go** (`npm run start -w mobile` + QR),
+- albo przez **Xcode/EAS internal distribution** bez publikacji w App Store.
+
+Szczegóły instalacji i komendy są opisane w `mobile/README.md`.
