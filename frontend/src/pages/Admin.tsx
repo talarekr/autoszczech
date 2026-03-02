@@ -10,25 +10,8 @@ import type { AdminUser } from "../types/user";
 
 type AdminOffer = CarOffer & { user?: { id: number; email: string } };
 type AdminCar = Car & { offers: AdminOffer[] };
-type WonAuction = {
-  id: number;
-  displayId?: string | null;
-  make?: string | null;
-  model?: string | null;
-  provider?: string | null;
-  auctionEnd?: string | null;
-  winnerOffer: {
-    id: number;
-    amount: number;
-    createdAt?: string | null;
-    userId: number;
-    user?: {
-      id: number;
-      email: string;
-      firstName?: string | null;
-      lastName?: string | null;
-    } | null;
-  };
+type WonAuction = AdminCar & {
+  offers: Array<AdminOffer & { user?: { id: number; email: string; firstName?: string | null; lastName?: string | null } }>;
 };
 
 type WinnerButtonState = {
@@ -72,9 +55,6 @@ export default function Admin() {
   const [clientsError, setClientsError] = useState<string | null>(null);
   const [approvingUserId, setApprovingUserId] = useState<number | null>(null);
   const [rejectingUserId, setRejectingUserId] = useState<number | null>(null);
-  const [wonAuctions, setWonAuctions] = useState<WonAuction[]>([]);
-  const [wonAuctionsLoading, setWonAuctionsLoading] = useState(false);
-  const [wonAuctionsError, setWonAuctionsError] = useState<string | null>(null);
 
   const isAdmin = isLoggedIn && userRole === "ADMIN";
 
@@ -517,32 +497,6 @@ export default function Admin() {
       setClientsError(t("admin.clients.rejectError"));
     } finally {
       setRejectingUserId(null);
-    }
-  };
-
-  const fetchWonAuctions = async () => {
-    if (!token || !isAdmin) {
-      setWonAuctionsError(t("admin.wonAuctions.authRequired"));
-      setWonAuctions([]);
-      return;
-    }
-
-    setWonAuctionsLoading(true);
-    setWonAuctionsError(null);
-
-    try {
-      const apiUrl = await getApiUrl();
-      const response = await axios.get<{ wonAuctions: WonAuction[] }>(`${apiUrl}/api/admin/won-auctions`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      setWonAuctions(response.data.wonAuctions ?? []);
-    } catch (err) {
-      console.error("Nie udało się pobrać aukcji wygranych", err);
-      setWonAuctionsError(t("admin.wonAuctions.loadError"));
-      setWonAuctions([]);
-    } finally {
-      setWonAuctionsLoading(false);
     }
   };
 
@@ -1024,8 +978,8 @@ export default function Admin() {
             ) : (
               <div className="space-y-3">
                 {wonAuctions.map((auction) => {
-                  const winner = auction.winnerOffer;
-                  const winnerName = [winner.user?.firstName, winner.user?.lastName].filter(Boolean).join(" ") || t("admin.clients.unknownName");
+                  const winner = auction.offers.find((offer) => offer.winnerStatus === "AWARDED" && offer.isWinner);
+                  const winnerName = [winner?.user?.firstName, winner?.user?.lastName].filter(Boolean).join(" ") || t("admin.clients.unknownName");
                   return (
                     <article key={auction.id} className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1033,7 +987,7 @@ export default function Admin() {
                           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">
                             ID: {auction.displayId ?? auction.id}
                           </p>
-                          <h3 className="text-lg font-semibold text-neutral-900">{auction.make ?? "—"} {auction.model ?? ""}</h3>
+                          <h3 className="text-lg font-semibold text-neutral-900">{auction.make} {auction.model}</h3>
                           <p className="text-sm text-neutral-600">{auction.provider ?? "—"} · {formatDateTime(auction.auctionEnd)}</p>
                         </div>
                         <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-800 ring-1 ring-emerald-200">
@@ -1043,9 +997,9 @@ export default function Admin() {
 
                       <div className="rounded-xl bg-neutral-50 p-3 text-sm text-neutral-700">
                         <p><span className="font-semibold">{t("admin.wonAuctions.winner")}: </span>{winnerName}</p>
-                        <p><span className="font-semibold">{t("admin.wonAuctions.winnerEmail")}: </span>{winner.user?.email ?? `ID: ${winner.userId}`}</p>
-                        <p><span className="font-semibold">{t("admin.wonAuctions.winningBid")}: </span>{formatCurrency(winner.amount)}</p>
-                        <p><span className="font-semibold">{t("admin.wonAuctions.awardedAt")}: </span>{formatDateTime(winner.createdAt)}</p>
+                        <p><span className="font-semibold">{t("admin.wonAuctions.winnerEmail")}: </span>{winner?.user?.email ?? `ID: ${winner?.userId ?? "—"}`}</p>
+                        <p><span className="font-semibold">{t("admin.wonAuctions.winningBid")}: </span>{winner ? formatCurrency(winner.amount) : "—"}</p>
+                        <p><span className="font-semibold">{t("admin.wonAuctions.awardedAt")}: </span>{winner?.createdAt ? formatDateTime(winner.createdAt) : "—"}</p>
                       </div>
                     </article>
                   );
