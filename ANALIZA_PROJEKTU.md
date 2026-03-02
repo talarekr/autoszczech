@@ -2,156 +2,148 @@
 
 ## 1) Charakter repozytorium
 
-Repozytorium `autoszczech` jest monorepo zarządzanym przez **npm workspaces** (`package.json` w katalogu głównym), z podziałem na trzy główne obszary:
+Repozytorium `autoszczech` to monorepo oparte o **npm workspaces** (`package.json` w katalogu głównym), z wyraźnym podziałem na:
 
-- `backend/` — API HTTP (Node.js + Express + Prisma + PostgreSQL),
-- `frontend/` — aplikacja kliencka (React + Vite + Tailwind + i18next),
-- `shared/` — współdzielony kod domenowy (np. importer danych).
+- `backend/` — API (Node.js + Express + Prisma + PostgreSQL),
+- `frontend/` — aplikację webową (React + Vite + Tailwind + i18next),
+- `shared/` — współdzielone moduły domenowe/importery.
 
-Dodatkowo projekt zawiera pliki i skrypty operacyjne (`render.yaml`, `scripts/*`, dokumentację wdrożeniową).
+W katalogu głównym znajdują się też pliki operacyjne i wdrożeniowe (`render.yaml`, `scripts/`, dokumentacja).
 
-## 2) Struktura katalogów i odpowiedzialności
+## 2) Struktura katalogów
 
 ### Root
 
-- `README.md` — instrukcja uruchomienia, wdrożenia (Render/Vercel), importu FTP i operacji administracyjnych,
-- `render.yaml` — blueprint infrastruktury Render (backend + PostgreSQL + persistent disk),
-- `.env.example` — przykładowe zmienne środowiskowe backendu i frontendu,
-- `scripts/` — skrypty pomocnicze (tworzenie archiwów, reset zdalnej gałęzi).
+- `README.md` — instrukcja uruchomienia i wdrożenia (Render + Vercel), opis importu FTP, panelu admina i procedur operacyjnych.
+- `package.json` — deklaracja workspace (`backend`, `frontend`).
+- `package-lock.json` — wspólny lockfile dla całego monorepo.
+- `render.yaml` — blueprint usługi backendowej + bazy PostgreSQL + persistent disk dla obrazów.
+- `scripts/` — narzędzia do przygotowania paczek i resetu zdalnego `main`.
 
 ### Backend (`backend/`)
 
-- `src/index.ts` + `src/start.ts` — bootstrap aplikacji i serwera,
-- `src/routes/` — endpointy (`auth`, `cars`, `offers`, `favorites`, `admin`, `import`),
-- `src/middleware/auth.ts` — autoryzacja JWT,
-- `src/jobs/ftpWatcher.ts` — cykliczne odpytywanie FTP i uruchamianie importu,
-- `src/lib/` — moduły pomocnicze (Prisma client, JWT, konfiguracja FTP, mailer, importer),
-- `prisma/schema.prisma` + `prisma/migrations/` — model bazy i migracje,
-- `prisma/seed.mjs` — seed konta administratora i danych startowych.
+- `src/start.ts`, `src/index.ts` — start aplikacji i serwera.
+- `src/routes/` — endpointy: `auth`, `cars`, `offers`, `favorites`, `admin`, `import`.
+- `src/middleware/auth.ts` — autoryzacja JWT.
+- `src/jobs/ftpWatcher.ts` — cykliczne odpytywanie FTP i uruchamianie importu.
+- `src/lib/` — moduły pomocnicze (Prisma, JWT, mailer, konfiguracja FTP, importer).
+- `prisma/schema.prisma` + `prisma/migrations/` — model danych i migracje.
+- `prisma/seed.mjs` — dane startowe (m.in. konto admina).
 
 ### Frontend (`frontend/`)
 
-- `src/main.tsx`, `src/App.tsx` — wejście i routing aplikacji,
-- `src/pages/` — ekrany użytkownika i panel administratora,
-- `src/components/` — współdzielone komponenty UI,
-- `src/contexts/` — kontekst autoryzacji i danych domenowych,
-- `src/lib/api.ts` — wykrywanie/wybór aktywnego backendu,
-- `src/i18n.ts` + `frontend/i18n.ts` — konfiguracja internacjonalizacji,
-- `tailwind.config.cjs`, `postcss.config.cjs`, `vite.config.ts` — konfiguracja warstwy frontowej.
+- `src/main.tsx`, `src/App.tsx` — bootstrap i routing aplikacji.
+- `src/pages/` — widoki użytkownika i panelu administracyjnego.
+- `src/components/` — komponenty UI.
+- `src/contexts/` — konteksty autoryzacji i danych ofert.
+- `src/lib/api.ts` — logika wyboru aktywnego backendu.
+- `src/i18n.ts` (+ `frontend/i18n.ts`) — konfiguracja internacjonalizacji.
+- `vite.config.ts`, `tailwind.config.cjs`, `postcss.config.cjs` — konfiguracja narzędzi frontowych.
 
 ### Shared (`shared/`)
 
-- `shared/importers/insurance.ts` — współdzielone parsery/mapowanie danych importowanych.
+- `shared/importers/insurance.ts` — współdzielone mapowanie/import danych.
 
-## 3) Konfiguracja i uruchamianie
+## 3) Konfiguracja i zależności
 
 ### Workspaces
 
-`package.json` w root zawiera:
+Root:
 
 - `workspaces: ["backend", "frontend"]`.
 
-To pozwala instalować zależności i używać wspólnych modułów z jednego lockfile (`package-lock.json`).
-
 ### Backend
 
-`backend/package.json` udostępnia m.in.:
+Skrypty (`backend/package.json`):
 
-- `dev` — `ts-node-dev` (tryb developerski),
-- `build` — `prisma generate && tsc`,
-- `start` — uruchomienie zbudowanego backendu,
-- `start:prod` — migracje + start,
-- `prisma:migrate`, `prisma:seed` — operacje bazy.
+- `dev`: `ts-node-dev --respawn --transpile-only src/index.ts`
+- `build`: `prisma generate && tsc`
+- `start`: `node dist/backend/src/start.js`
+- `start:prod`: `npm run prisma:migrate && node dist/backend/src/start.js`
 
-`backend/tsconfig.json`:
+Główne zależności runtime:
 
-- `strict: true`,
-- alias `#shared/* -> ../shared/*`,
-- kompilacja do `dist/`.
+- `express`, `cors`, `helmet`, `morgan`
+- `@prisma/client`, `prisma`
+- `bcryptjs`, `jsonwebtoken`, `dotenv`
+
+Zależności dev:
+
+- `typescript`
+- pakiety `@types/*` dla używanych bibliotek
+
+TypeScript (`backend/tsconfig.json`):
+
+- `strict: true`
+- alias `#shared/* -> ../shared/*`
+- `outDir: dist`
 
 ### Frontend
 
-`frontend/package.json` udostępnia:
+Skrypty (`frontend/package.json`):
 
-- `dev` — Vite dev server,
-- `build` — build produkcyjny,
-- `preview` — lokalny podgląd builda.
+- `dev`: `vite`
+- `build`: `vite build`
+- `preview`: `vite preview`
 
-`frontend/tsconfig.json`:
+Główne zależności runtime:
 
-- `strict: true`,
-- alias `@shared/* -> ../shared/*`,
-- `jsx: react-jsx`.
+- `react`, `react-dom`, `react-router-dom`
+- `axios`
+- `i18next`, `react-i18next`
 
-`frontend/vite.config.ts` utrzymuje alias `@shared` oraz plugin React.
+Zależności dev:
 
-## 4) Zależności
+- `vite`, `@vitejs/plugin-react`
+- `tailwindcss`, `postcss`, `autoprefixer`
+- `typescript`
 
-### Backend (runtime)
+TypeScript (`frontend/tsconfig.json`):
 
-- `express`, `cors`, `helmet`, `morgan`,
-- `@prisma/client`, `prisma`,
-- `bcryptjs`, `jsonwebtoken`, `dotenv`.
+- `strict: true`
+- alias `@shared/* -> ../shared/*`
 
-### Backend (dev)
+Vite (`frontend/vite.config.ts`):
 
-- `typescript`,
-- pakiety `@types/*` dla używanych bibliotek.
+- plugin React
+- alias `@shared` wskazujący na `../shared`
 
-### Frontend (runtime)
+## 4) Deployment i środowiska
 
-- `react`, `react-dom`, `react-router-dom`,
-- `axios`,
-- `i18next`, `react-i18next`.
+### Render (`render.yaml`)
 
-### Frontend (dev)
-
-- `vite`, `@vitejs/plugin-react`,
-- `tailwindcss`, `postcss`, `autoprefixer`,
-- `typescript`.
-
-## 5) Infrastruktura i środowiska
-
-### Render
-
-`render.yaml` definiuje:
-
-- usługę web `autoszczech-backend` (Node),
-- bazę `autoszczech-db` (PostgreSQL),
-- dysk persistent montowany jako `/var/data` (pod obrazy z FTP),
-- build/start command zgodne z backendowymi skryptami npm,
-- zestaw envów dla importera FTP i publicznego adresu backendu.
+- usługa web: `autoszczech-backend` (Node)
+- baza: `autoszczech-db` (PostgreSQL)
+- build: instalacja zależności + build backendu + migracje
+- start: `npm run start:prod --prefix backend`
+- persistent disk: `/var/data` (dla obrazów z importu FTP)
+- envy dla DB/JWT oraz importu FTP (host, katalogi, interwał, limit pobierania)
 
 ### Vercel
 
-Frontend jest przygotowany do wdrożenia z katalogu `frontend/`.
+Frontend jest przygotowany do deployu z katalogu `frontend/`.
 
-### Zmienne środowiskowe
+## 5) Przepływ działania aplikacji
 
-`.env.example` obejmuje konfigurację:
-
-- bazy i JWT,
-- importu FTP,
-- SMTP/mailingu,
-- URL-i backendu/frontendu.
-
-## 6) Przepływy funkcjonalne
-
-1. Frontend ustala działający adres API (`VITE_API_URL` + fallback przez `/api/health`).
+1. Frontend wybiera działający backend (konfiguracja + fallback).
 2. Backend wystawia REST API i obsługuje JWT.
-3. Watcher FTP pobiera JSON-y i zdjęcia, przetwarza je oraz zapisuje historię importów.
-4. Panel admina umożliwia operacje zarządcze i ręczne uruchamianie importu.
+3. Watcher FTP cyklicznie pobiera JSON + zdjęcia, importuje oferty i zapisuje historię importów.
+4. Panel admina udostępnia operacje administracyjne i ręczne uruchamianie importu.
 
-## 7) Weryfikacja techniczna wykonana podczas analizy
+## 6) Weryfikacja techniczna wykonana podczas analizy
 
-W ramach analizy uruchomiono build obu aplikacji:
+Wykonane lokalnie:
 
-- backend: `npm run build --prefix backend` — **OK**,
-- frontend: `npm run build --prefix frontend` — **OK** (z ostrzeżeniem Vite o chunku ~502 kB).
+- `npm run build --prefix backend` — **OK**
+- `npm run build --prefix frontend` — **OK**
 
-## 8) Wnioski i rekomendacje
+Uwagi:
 
-- Architektura jest spójna i czytelna: wyraźny podział backend/frontend/shared.
-- Konfiguracja wdrożeniowa jest kompletna (Render Blueprint + wskazówki Vercel).
-- Warto rozważyć optymalizację bundle frontendu (code splitting), aby ograniczyć duży główny chunk.
-- W dokumentacji i `.env.example` widoczne są przykładowe dane wrażliwe — należy traktować je wyłącznie testowo i rotować w środowisku produkcyjnym.
+- podczas obu komend pojawia się ostrzeżenie npm: `Unknown env config "http-proxy"` (nie blokuje builda),
+- frontend generuje bundle JS ~502 kB i Vite zgłasza ostrzeżenie o rozmiarze chunku.
+
+## 7) Wnioski
+
+- Repo jest spójnie zorganizowane jako monorepo frontend/backend/shared.
+- Konfiguracja wdrożeniowa jest kompletna i gotowa do uruchomienia na Render + Vercel.
+- Najbardziej oczywiste miejsce optymalizacji to podział bundle frontendu (code-splitting), aby obniżyć rozmiar głównego chunku.
