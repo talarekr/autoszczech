@@ -256,6 +256,11 @@ export default function CarDetails() {
           return;
         }
 
+        if (error.response?.status === 409) {
+          setOfferFeedback({ type: "error", key: "carDetails.offerForm.duplicateAmount" });
+          return;
+        }
+
         const serverMessage = typeof error.response?.data?.error === "string" ? error.response.data.error : null;
         if (serverMessage) {
           setOfferFeedback({
