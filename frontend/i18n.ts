@@ -319,7 +319,7 @@ export const resources = {
           tooLow: "Kwota oferty musi wynosić co najmniej {{amount}}.",
           duplicateAmount: "Ta kwota została już przez Ciebie złożona dla tej aukcji.",
           notLoggedIn: "Zaloguj się, aby złożyć ofertę.",
-          unauthorized: "Sesja wygasła. Zaloguj się ponownie, aby licytować.",
+          unauthorized: "Sesja wygasła. Zaloguj się ponownie.",
           serverErrorDetails: "Nie udało się zapisać oferty: {{message}}.",
           serverError: "Nie udało się zapisać oferty. Spróbuj ponownie za chwilę.",
         },
