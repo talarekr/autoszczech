@@ -53,6 +53,21 @@ r.post("/", auth("USER"), async (req: AuthReq, res: Response) => {
       return res.status(400).json({ error: "Aukcja jest już zakończona" });
     }
 
+    const duplicateOffer = await prisma.offer.findFirst({
+      where: {
+        carId: car.id,
+        userId: req.user!.id,
+        amount: parsedAmount,
+      },
+      select: { id: true },
+    });
+
+    if (duplicateOffer) {
+      return res
+        .status(409)
+        .json({ error: "Ta sama kwota została już przez Ciebie złożona dla tej aukcji" });
+    }
+
     const offer = await prisma.offer.create({
       data: { carId: car.id, amount: parsedAmount, message, userId: req.user!.id }
     });
