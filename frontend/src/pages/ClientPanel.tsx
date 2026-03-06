@@ -110,7 +110,7 @@ export default function ClientPanel() {
 
       try {
         const apiUrl = await getApiUrl();
-        const response = await axios.get<UserOffer[]>(`${apiUrl}/offers/mine`, {
+        const response = await axios.get<UserOffer[]>(`${apiUrl}/api/offers/mine`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -184,7 +184,7 @@ export default function ClientPanel() {
 
       try {
         const apiUrl = await getApiUrl();
-        const response = await axios.get<Favorite[]>(`${apiUrl}/favorites/mine`, {
+        const response = await axios.get<Favorite[]>(`${apiUrl}/api/favorites/mine`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!isMounted) return;
@@ -236,7 +236,7 @@ export default function ClientPanel() {
     setFavoritesLoading(true);
     try {
       const apiUrl = await getApiUrl();
-      await axios.delete(`${apiUrl}/favorites/${carId}`, {
+      await axios.delete(`${apiUrl}/api/favorites/${carId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setFavorites((prev) => prev.filter((favorite) => favorite.carId !== carId));
