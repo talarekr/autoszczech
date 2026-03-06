@@ -54,6 +54,19 @@ const formatAmount = (amount?: number | null) => {
   return `${amount.toLocaleString("pl-PL")} CHF`;
 };
 
+const MAIL_TIME_ZONE = "Europe/Warsaw";
+
+const formatMailDateTime = (value: Date) =>
+  value.toLocaleString("pl-PL", {
+    timeZone: MAIL_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+
 const readResponse = async (socket: net.Socket | tls.TLSSocket, expectedCode: number) => {
   const [data] = (await once(socket, "data")) as [Buffer];
   const message = data.toString().trim();
@@ -342,7 +355,7 @@ export const sendBidPlacedEmails = async ({
 }: BidPlacedInput) => {
   const auctionUrl = buildFrontendUrl(`/cars/${auctionId}`);
   const formattedAmount = formatAmount(amount) ?? "—";
-  const date = (placedAt ?? new Date()).toLocaleString("pl-PL");
+  const date = formatMailDateTime(placedAt ?? new Date());
   const firstName = sanitizeName(userFirstName);
   const lastName = typeof userLastName === "string" ? userLastName.trim() : "";
   const fullName = `${firstName} ${lastName}`.trim();

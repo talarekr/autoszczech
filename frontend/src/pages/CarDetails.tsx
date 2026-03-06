@@ -181,7 +181,7 @@ export default function CarDetails() {
       setFavoriteLoading(true);
       try {
         const apiUrl = await getApiUrl();
-        const response = await axios.get<Favorite[]>(`${apiUrl}/favorites/mine`, {
+        const response = await axios.get<Favorite[]>(`${apiUrl}/api/favorites/mine`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -221,7 +221,7 @@ export default function CarDetails() {
     try {
       const apiUrl = await getApiUrl();
       const response = await axios.post<(CarOffer & { carId: number; message?: string })>(
-        `${apiUrl}/offers`,
+        `${apiUrl}/api/offers`,
         {
           carId: car.id,
           displayId: car.displayId,
@@ -256,6 +256,11 @@ export default function CarDetails() {
           return;
         }
 
+        if (error.response?.status === 409) {
+          setOfferFeedback({ type: "error", key: "carDetails.offerForm.duplicateAmount" });
+          return;
+        }
+
         const serverMessage = typeof error.response?.data?.error === "string" ? error.response.data.error : null;
         if (serverMessage) {
           setOfferFeedback({
@@ -287,14 +292,14 @@ export default function CarDetails() {
     try {
       const apiUrl = await getApiUrl();
       if (favoriteId) {
-        await axios.delete(`${apiUrl}/favorites/${car.id}`, {
+        await axios.delete(`${apiUrl}/api/favorites/${car.id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         setFavoriteId(null);
         setFavoriteFeedback({ type: "success", key: "carDetails.favorites.removed" });
       } else {
         const response = await axios.post<Favorite>(
-          `${apiUrl}/favorites`,
+          `${apiUrl}/api/favorites`,
           { carId: car.id, displayId: car.displayId },
           { headers: { Authorization: `Bearer ${token}` } }
         );
