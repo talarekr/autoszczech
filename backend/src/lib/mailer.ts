@@ -56,16 +56,22 @@ const formatAmount = (amount?: number | null) => {
 
 const MAIL_TIME_ZONE = "Europe/Warsaw";
 
-const formatMailDateTime = (value: Date) =>
-  value.toLocaleString("pl-PL", {
-    timeZone: MAIL_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
+const mailDateTimeFormatter = new Intl.DateTimeFormat("pl-PL", {
+  timeZone: MAIL_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+});
+
+const formatMailDateTime = (value: Date | string | number) => {
+  const parsed = new Date(value);
+  const safeDate = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  return mailDateTimeFormatter.format(safeDate);
+};
 
 const readResponse = async (socket: net.Socket | tls.TLSSocket, expectedCode: number) => {
   const [data] = (await once(socket, "data")) as [Buffer];
@@ -341,7 +347,7 @@ type BidPlacedInput = {
   carName: string;
   amount?: number | null;
   auctionId: string;
-  placedAt?: Date;
+  placedAt?: Date | string | number;
 };
 
 export const sendBidPlacedEmails = async ({

@@ -2,143 +2,155 @@
 
 ## 1) Charakter i zakres repozytorium
 
-Repozytorium `autoszczech` jest monorepo oparte o **npm workspaces** i zawiera kompletną aplikację webową:
+Repozytorium `autoszczech` to istniejące monorepo oparte o **npm workspaces**, które zawiera kompletną aplikację produkcyjną:
 
-- **frontend** (React + Vite + Tailwind + i18next),
-- **backend** (Node.js + Express + Prisma + PostgreSQL),
-- **shared** (współdzielone parsery/importery domenowe).
+- **frontend**: React + Vite + Tailwind + i18next,
+- **backend**: Node.js + Express + Prisma + PostgreSQL,
+- **shared**: logika współdzielona dla importerów.
 
-Stan repozytorium potwierdza, że to projekt już działający produkcyjnie (Render + Vercel), a nie szablon startowy.
+Projekt jest przygotowany do utrzymania i wdrażania (Render + Vercel), z gotową dokumentacją operacyjną i skryptami pomocniczymi.
 
 ## 2) Struktura katalogów
 
 ### Root
 
-- `package.json` – konfiguracja workspaces (`backend`, `frontend`).
-- `package-lock.json` – wspólny lockfile dla całego monorepo.
-- `README.md` – instrukcje uruchomienia, wdrożenia i utrzymania.
-- `render.yaml` – deklaratywny deployment backendu + PostgreSQL + persistent disk.
-- `.env.example` – pełna lista zmiennych środowiskowych backendu i frontendu.
-- `scripts/` – skrypty operacyjne (pakowanie archiwów, reset zdalnej gałęzi `main`).
+- `package.json` – konfiguracja workspace’ów (`backend`, `frontend`).
+- `package-lock.json` – wspólny lockfile.
+- `README.md` – instrukcje konfiguracji, deployu i utrzymania.
+- `.env.example` – przykładowe zmienne środowiskowe.
+- `render.yaml` – blueprint backendu i bazy PostgreSQL na Render.
+- `scripts/` – skrypty operacyjne (pakowanie archiwów, reset zdalnego `main`).
+- `ANALIZA_PROJEKTU.md` – dokument analizy technicznej.
 
 ### Backend (`backend/`)
 
-- `src/index.ts` – konfiguracja Express i rejestracja tras API.
-- `src/routes/` – endpointy (`auth`, `cars`, `offers`, `favorites`, `admin`, `import`).
-- `src/middleware/auth.ts` – autoryzacja JWT i ochrona tras.
-- `src/lib/` – biblioteki pomocnicze (Prisma, JWT, mailer, FTP importer).
-- `src/jobs/ftpWatcher.ts` – cykliczny import JSON + obrazów z FTP.
+- `src/index.ts` – bootstrap Express, middleware, trasy API, uruchamianie watchera FTP.
+- `src/start.ts` – start aplikacji ze ścieżką builda produkcyjnego.
+- `src/routes/` – endpointy (`auth`, `cars`, `offers`, `favorites`, `import`, `admin`).
+- `src/lib/` – moduły narzędziowe (Prisma, JWT, SMTP, FTP config, importer).
+- `src/jobs/ftpWatcher.ts` – harmonogram i cykliczne uruchamianie importu.
+- `src/middleware/` – autoryzacja i walidacje po stronie API.
 - `prisma/schema.prisma` + `prisma/migrations/` – model danych i migracje.
 
 ### Frontend (`frontend/`)
 
-- `src/main.tsx`, `src/App.tsx` – bootstrap aplikacji i routing.
-- `src/pages/` – widoki publiczne i panelowe (w tym `Admin.tsx`).
-- `src/components/` – komponenty wielokrotnego użycia.
-- `src/contexts/` – stan sesji i inwentarza.
-- `src/lib/api.ts` – wybór aktywnego backendu/fallback URL.
-- `src/i18n.ts` – konfiguracja tłumaczeń PL/EN/DE.
-- `vite.config.ts`, `tailwind.config.cjs`, `postcss.config.cjs` – tooling build/runtime.
-- `vercel.json` – rewrites `/api` i `/uploads` do backendu.
+- `src/main.tsx`, `src/App.tsx` – punkt wejścia i routing.
+- `src/pages/` – strony publiczne i panel administracyjny.
+- `src/components/` – komponenty wielokrotnego użytku.
+- `src/contexts/` – konteksty aplikacyjne.
+- `src/lib/` – helpery i warstwa API.
+- `src/i18n.ts` – konfiguracja internacjonalizacji.
+- `vite.config.ts`, `tailwind.config.cjs`, `postcss.config.cjs` – konfiguracja toolingu.
+- `vercel.json` – konfiguracja wdrożenia frontendu i proxy tras.
 
 ### Shared (`shared/`)
 
-- `shared/importers/insurance.ts` – wspólna logika parsera ofert/importu.
+- `shared/importers/insurance.ts` – współdzielony parser/importer danych.
 
-## 3) README — co dokumentuje i jak prowadzi wdrożenie
+## 3) README i dokumentacja operacyjna
 
-`README.md` opisuje pełny przepływ operacyjny:
+`README.md` zawiera pełen przepływ utrzymaniowy:
 
-1. **Konfiguracja ENV** (lokalna i produkcyjna),
-2. **Render Blueprint** (backend + DB + dysk trwały),
-3. **Vercel** (frontend),
-4. **Automatyczny import FTP** (JSON + zdjęcia + endpointy administracyjne),
-5. **Pakowanie snapshotów projektu** (`zip`, `tar`, base64),
-6. **Procedury administracyjne** (np. wymuszony reset zdalnego `main`).
+1. konfigurację środowiska lokalnego i produkcyjnego,
+2. wdrożenie backendu + DB przez Render Blueprint,
+3. wdrożenie frontendu na Vercel,
+4. automatyczny import JSON + zdjęć z FTP,
+5. endpointy administracyjne importu,
+6. generowanie paczek/snapshotów do dystrybucji,
+7. procedury awaryjne (m.in. reset zdalnej gałęzi `main`).
 
-Dokumentacja jest rozbudowana i nastawiona na operacyjne utrzymanie projektu (deploy, import, troubleshooting, pakowanie artefaktów).
+Dokumentacja jest praktyczna i nastawiona na pracę operacyjną, a nie tylko uruchomienie developmentowe.
 
 ## 4) Konfiguracja i zależności
 
 ### Monorepo
 
-- Root używa `workspaces: ["backend", "frontend"]`.
-- Jedna instalacja zależności obsługuje oba moduły aplikacji.
+- Root definiuje `workspaces: ["backend", "frontend"]`.
+- Całość korzysta ze wspólnego lockfile (`package-lock.json`).
 
 ### Backend (`backend/package.json`)
 
-**Runtime dependencies**:
-- API i bezpieczeństwo: `express`, `cors`, `helmet`, `morgan`.
-- Dane: `@prisma/client`, `prisma`.
-- Autoryzacja i hashowanie: `jsonwebtoken`, `bcryptjs`.
+**Kluczowe zależności runtime**:
+
+- API i middleware: `express`, `cors`, `helmet`, `morgan`.
+- Dostęp do danych: `@prisma/client`, `prisma`.
+- Uwierzytelnianie: `jsonwebtoken`, `bcryptjs`.
 - Konfiguracja: `dotenv`.
 
-**Dev dependencies**:
-- `typescript` + pakiet typów (`@types/*`).
+**Tooling/dev**:
+
+- `typescript` + `@types/*`.
 
 **Skrypty**:
-- `dev`: lokalny development serwera,
-- `build`: `prisma generate && tsc`,
-- `start:prod`: migracje + start serwera ze zbudowanego `dist`.
+
+- `dev` – development serwera,
+- `build` – `prisma generate && tsc`,
+- `start` / `start:prod` – start środowiska produkcyjnego,
+- `prisma:*` – operacje na migracjach i seedzie.
 
 ### Frontend (`frontend/package.json`)
 
-**Runtime dependencies**:
-- `react`, `react-dom`, `react-router-dom`,
-- `axios`,
-- `i18next`, `react-i18next`.
+**Kluczowe zależności runtime**:
 
-**Dev dependencies**:
+- UI i routing: `react`, `react-dom`, `react-router-dom`.
+- Komunikacja: `axios`.
+- i18n: `i18next`, `react-i18next`.
+
+**Tooling/dev**:
+
 - `vite`, `@vitejs/plugin-react`,
 - `tailwindcss`, `postcss`, `autoprefixer`,
 - `typescript`.
 
 **Skrypty**:
-- `dev`, `build`, `preview` (standard Vite).
 
-## 5) Dane i model domenowy (Prisma)
+- `dev`, `build`, `preview` (standardowy workflow Vite).
 
-Główne encje backendu:
+## 5) Warstwa danych i domena (Prisma)
 
-- `User` (role, status rejestracji, dane formularza),
+Na podstawie struktury backendu i dokumentacji projekt obejmuje m.in. encje:
+
+- `User` (role i statusy użytkowników),
 - `Car` + `CarImage` (aukcje i zdjęcia),
-- `Offer` (oferty użytkowników),
+- `Offer` (oferty składane przez użytkowników),
 - `Favorite` (ulubione aukcje),
-- `ImportJob` (rejestr cykli importu FTP).
+- `ImportJob` (historia importów FTP i błędów).
 
-W modelu obecne są indeksy pod listowanie aukcji i relacje (`Car`, `Offer`, `Favorite`, `CarImage`), co wspiera wydajność endpointów listujących.
+Model jest zorientowany na obsługę listowania aukcji, działań użytkownika i automatycznego importu danych zewnętrznych.
 
-## 6) Spójność konfiguracji (README vs kod)
+## 6) Spójność konfiguracji (obserwacje)
 
-Analiza pokazała, że większość dokumentacji i konfiguracji jest spójna, ale warto monitorować poniższe punkty:
+Analiza wykazała kilka istotnych punktów utrzymaniowych:
 
-1. **Import FTP**
-   - Kod backendu używa `FTP_JSON_DIRECTORY`, `FTP_IMAGE_DIRECTORY`, `FTP_PUBLIC_IMAGE_BASE`, `FTP_LOCAL_IMAGE_DIR`.
-   - W `.env.example` nadal występują historyczne wpisy (`FTP_DIRECTORY`, `FTP_IMAGE_BASE_URL`), które nie są głównymi nazwami używanymi przez aktualny parser konfiguracji.
+1. **Nazwy zmiennych FTP w dokumentacji vs kodzie**
+   - Kod (`backend/src/lib/ftpConfig.ts`) używa m.in. `FTP_JSON_DIRECTORY`, `FTP_IMAGE_DIRECTORY`, `FTP_PUBLIC_IMAGE_BASE`, `FTP_LOCAL_IMAGE_DIR`.
+   - `.env.example` nadal zawiera historyczne nazwy (`FTP_DIRECTORY`, `FTP_IMAGE_BASE_URL`), które nie odpowiadają aktualnej konfiguracji parsera.
 
-2. **Wartości domyślne FTP w kodzie**
-   - `backend/src/lib/ftpConfig.ts` zawiera domyślne wartości hosta/użytkownika/hasła FTP, które powinny być traktowane jako techniczne fallbacki, nie docelowa konfiguracja produkcyjna.
+2. **Fallback credentials w `ftpConfig.ts`**
+   - W kodzie obecne są domyślne fallbacki dla `FTP_HOST`, `FTP_USER`, `FTP_PASSWORD`.
+   - Technicznie działa to jako zabezpieczenie przed pustą konfiguracją, ale produkcyjnie zalecane jest pełne nadpisanie ENV i traktowanie fallbacków jako pomoc deweloperska.
 
-3. **Bundle frontendu**
-   - Build frontendu przechodzi poprawnie, ale pojawia się ostrzeżenie Vite o chunku >500 kB (potencjalny obszar optymalizacji).
+3. **Wydajność bundla frontendu**
+   - Build frontendu przechodzi poprawnie, ale Vite zgłasza ostrzeżenie o chunku >500 kB.
+   - To sygnał do ewentualnego code-splittingu (np. dynamic import dla cięższych widoków panelu).
 
-## 7) Weryfikacja wykonana podczas analizy
+## 7) Weryfikacja techniczna wykonana podczas analizy
 
-Wykonane komendy:
+Wykonano lokalne buildy obu workspace’ów:
 
 - `npm run build --prefix backend` ✅
 - `npm run build --prefix frontend` ✅
 
-Wynik:
+Wyniki:
 
 - oba buildy zakończone sukcesem,
-- pojawia się ostrzeżenie npm o `Unknown env config "http-proxy"` (nie blokuje kompilacji),
-- frontend zgłasza ostrzeżenie o rozmiarze bundla (informacyjne).
+- pojawia się nieblokujące ostrzeżenie npm o `Unknown env config "http-proxy"`,
+- frontend zwraca informacyjne ostrzeżenie Vite dotyczące rozmiaru paczki.
 
-## 8) Podsumowanie architektoniczne
+## 8) Podsumowanie
 
-Projekt jest dojrzałym, wdrożonym monorepo z czytelnym podziałem odpowiedzialności i pełnym zapleczem deploymentowym. Najważniejsze obszary do dalszego utrzymania to:
+Repozytorium jest spójnym, działającym projektem produkcyjnym, a nie szkieletem startowym. Najważniejsze obszary do dalszej poprawy operacyjnej:
 
-- porządkowanie i ujednolicenie nazw zmiennych środowiskowych związanych z FTP,
-- utrzymanie bezpiecznych wartości konfiguracyjnych poza repo,
-- optymalizacja rozmiaru bundla frontendu (code-splitting cięższych widoków).
+- ujednolicenie nazewnictwa zmiennych FTP między `.env.example`, README i kodem,
+- przegląd domyślnych fallbacków konfiguracyjnych pod kątem bezpieczeństwa,
+- optymalizacja rozmiaru bundle frontendu (code-splitting i manual chunks).
