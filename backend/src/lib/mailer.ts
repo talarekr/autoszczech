@@ -346,7 +346,8 @@ type BidPlacedInput = {
   userLastName?: string | null;
   carName: string;
   amount?: number | null;
-  auctionId: string;
+  frontendAuctionId: number;
+  externalAuctionId?: string | null;
   placedAt?: Date | string | number;
 };
 
@@ -356,10 +357,11 @@ export const sendBidPlacedEmails = async ({
   userLastName,
   carName,
   amount,
-  auctionId,
+  frontendAuctionId,
+  externalAuctionId,
   placedAt,
 }: BidPlacedInput) => {
-  const auctionUrl = buildFrontendUrl(`/cars/${auctionId}`);
+  const auctionUrl = buildFrontendUrl(`/offer/${frontendAuctionId}`);
   const formattedAmount = formatAmount(amount) ?? "—";
   const date = formatMailDateTime(placedAt ?? new Date());
   const firstName = sanitizeName(userFirstName);
@@ -401,7 +403,7 @@ export const sendBidPlacedEmails = async ({
       `Pojazd: ${carName}`,
       `Kwota: ${formattedAmount}`,
       `Data: ${date}`,
-      "",
+      ...(externalAuctionId ? [`ID zewnętrzne aukcji: ${externalAuctionId}`, ""] : []),
       "Link do aukcji:",
       auctionUrl,
     ].join("\n"),
