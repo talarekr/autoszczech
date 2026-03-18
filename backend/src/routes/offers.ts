@@ -84,7 +84,8 @@ r.post("/", auth("USER"), async (req: AuthReq, res: Response) => {
         userLastName: bidder.lastName,
         carName: `${car.make} ${car.model} (${car.displayId})`,
         amount: parsedAmount,
-        auctionId: car.displayId,
+        frontendAuctionId: car.id,
+        externalAuctionId: car.displayId,
         placedAt: offer.createdAt,
       });
     }
