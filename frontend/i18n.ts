@@ -10,6 +10,7 @@ export const resources = {
           pl: "Polski",
           en: "English",
           de: "Deutsch",
+          uk: "Українська",
         },
         fuel: {
           any: "Dowolne paliwo",
@@ -1043,6 +1044,7 @@ export const resources = {
           pl: "Polish",
           en: "English",
           de: "German",
+          uk: "Ukrainian",
         },
         fuel: {
           any: "Any fuel",
@@ -2073,6 +2075,7 @@ export const resources = {
           pl: "Polnisch",
           en: "Englisch",
           de: "Deutsch",
+          uk: "Ukrainisch",
         },
         fuel: {
           any: "Beliebiger Kraftstoff",
@@ -3099,7 +3102,14 @@ export const resources = {
   },
 } as const;
 
-type ResourceTree = (typeof resources)[keyof typeof resources]["translation"];
+const i18nResources = {
+  ...resources,
+  uk: {
+    translation: resources.pl.translation,
+  },
+} as const;
+
+type ResourceTree = (typeof i18nResources)[keyof typeof i18nResources]["translation"];
 
 const resolveFallback = (key: string, tree: ResourceTree | string | undefined): string | undefined => {
   if (typeof tree === "string") {
@@ -3136,10 +3146,10 @@ const resolveFallback = (key: string, tree: ResourceTree | string | undefined): 
 i18n
   .use(initReactI18next)
   .init({
-    resources,
+    resources: i18nResources,
     lng: "pl",
     fallbackLng: ["pl", "en"],
-    supportedLngs: ["pl", "en", "de"],
+    supportedLngs: ["pl", "en", "de", "uk"],
     defaultNS: "translation",
     interpolation: { escapeValue: false },
     returnNull: false,

@@ -13,6 +13,7 @@ const languageOrder: Array<{ code: string; flag: string }> = [
   { code: "pl", flag: "🇵🇱" },
   { code: "de", flag: "🇩🇪" },
   { code: "en", flag: "🇬🇧" },
+  { code: "uk", flag: "🇺🇦" },
 ];
 
 export default function App() {
