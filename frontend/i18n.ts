@@ -10,6 +10,7 @@ export const resources = {
           pl: "Polski",
           en: "English",
           de: "Deutsch",
+          uk: "Українська",
         },
         fuel: {
           any: "Dowolne paliwo",
@@ -1043,6 +1044,7 @@ export const resources = {
           pl: "Polish",
           en: "English",
           de: "German",
+          uk: "Ukrainian",
         },
         fuel: {
           any: "Any fuel",
@@ -2073,6 +2075,7 @@ export const resources = {
           pl: "Polnisch",
           en: "Englisch",
           de: "Deutsch",
+          uk: "Ukrainisch",
         },
         fuel: {
           any: "Beliebiger Kraftstoff",
@@ -3099,7 +3102,148 @@ export const resources = {
   },
 } as const;
 
-type ResourceTree = (typeof resources)[keyof typeof resources]["translation"];
+const i18nResources = {
+  ...resources,
+  uk: {
+    translation: {
+      common: {
+        languageSwitcherLabel: "Виберіть мову",
+        languages: {
+          pl: "Польська",
+          en: "Англійська",
+          de: "Німецька",
+          uk: "Українська",
+        },
+        fuel: {
+          any: "Будь-яке паливо",
+          petrol: "Бензин",
+          diesel: "Дизель",
+          electric: "Електро",
+          hybrid: "Гібрид",
+          lpg: "LPG",
+          other: "Інше",
+        },
+        transmission: {
+          any: "Будь-яка",
+          automatic: "Автоматична",
+          manual: "Механічна",
+          semiAutomatic: "Напівавтоматична",
+          other: "Інша",
+        },
+        auctionStatus: {
+          all: "Усі",
+          active: "Активна",
+          planned: "Запланована",
+          finished: "Завершена",
+        },
+      },
+      nav: {
+        auctions: "Аукціони",
+        clientPanel: "Панель клієнта",
+        howToBuy: "Як купувати",
+        contact: "Контакт",
+        transportCalculator: "Калькулятор транспорту",
+        register: "Реєстрація",
+        login: "Увійти",
+        logout: "Вийти",
+        openMenu: "Відкрити меню",
+        closeMenu: "Закрити меню",
+        backHomeAria: "Повернутися на головну",
+        authMenuAria: "Відкрити меню входу та реєстрації",
+        loginAria: "Перейти до входу",
+      },
+      footer: {
+        terms: "Правила",
+        privacy: "Політика конфіденційності",
+        cookies: "Файли cookie",
+        admin: "Панель адміністратора",
+      },
+      calculator: {
+        badge: "CHF → PLN",
+        heading: "Калькулятор курсів",
+        description: "Введіть суму в CHF, а калькулятор перерахує її в PLN.",
+        amountLabel: "Введіть суму",
+        amountPlaceholder: "Введіть суму",
+        amountAria: "Сума у швейцарських франках",
+        rateLabel: "Поточний курс NBP",
+        rateValueLabel: "1 CHF =",
+        rateSource: "Таблиця A NBP",
+        rateUpdated: "Оновлено {{date}}",
+        rateLoading: "Завантаження поточного курсу…",
+        rateError: "Не вдалося завантажити курс. Використовуємо останнє збережене значення.",
+        resultLabel: "Сума після перерахунку",
+        resultPlaceholder: "—",
+      },
+      home: {
+        logoutSuccess: "Ви успішно вийшли з системи.",
+        hero: {
+          tagline: "import premium",
+          title: "Імпорт авто прямо зі Швейцарії",
+          subtitle:
+            "Знаходьте пропозиції авто, мотоциклів і спецтехніки від перевірених партнерів зі Швейцарії",
+          description:
+            "Знаходьте пропозиції авто, мотоциклів і спецтехніки від перевірених партнерів з усієї Європи.",
+          points: {
+            access: "Доступ до аукціонів 24/7",
+            verified: "Перевірені постачальники та прозорі умови",
+            logistics: "Повна логістична підтримка та калькулятор транспорту",
+          },
+        },
+        search: {
+          badge: "Пошук пропозицій",
+          title: "Знайдіть авто своєї мрії",
+          query: "Пошук за фразою, напр. марка авто",
+          queryLabel: "Пошук за фразою, напр. марка авто",
+          placeholder: "напр. Audi A4",
+          queryPlaceholder: "напр. Audi A4",
+          yearFrom: "Рік випуску від",
+          yearTo: "Рік випуску до",
+          fuel: "Тип палива",
+          transmission: "Коробка передач",
+          provider: "Страхова компанія",
+          providerAny: "Будь-яка страхова компанія",
+          submit: "ШУКАТИ ПРОПОЗИЦІЇ",
+          reset: "Очистити фільтри",
+        },
+        listings: {
+          heading: "Актуальні аукціони",
+          subheading: "Переглядайте пропозиції перевірених постачальників.",
+          countLabel: "Кількість пропозицій",
+          sortLabel: "Сортувати:",
+          sort: {
+            endingAsc: "Час до завершення — за зростанням",
+            endingDesc: "Час до завершення — за спаданням",
+            newest: "Найновіші пропозиції",
+          },
+          demoMode: "Не вдалося підключитися до API. Показуємо демонстраційні дані.",
+          loading: "Завантаження пропозицій…",
+          error: "Не вдалося завантажити пропозиції. Спробуйте пізніше.",
+          empty: "Немає результатів за вибраними фільтрами. Змініть критерії пошуку.",
+        },
+        watchlist: {
+          title: "Слідкуйте за новими пропозиціями",
+          description:
+            "Вкажіть моделі авто, які вас цікавлять, і отримуйте оновлення на email, щойно з’являться нові пропозиції.",
+          placeholder: "Напр. Audi Q5, BMW X3, Mercedes GLC",
+          button: "Підписатися",
+        },
+      },
+      carCard: {
+        noImage: "Немає фото",
+        firstRegistration: "Дата першої реєстрації",
+        mileage: "Пробіг",
+        productionYear: "Рік випуску",
+        fuel: "Паливо",
+        transmission: "Коробка передач",
+        auctionEndDate: "Дата завершення аукціону",
+        auctionEndsIn: "До завершення аукціону",
+        viewDetails: "Переглянути деталі",
+      },
+    },
+  },
+} as const;
+
+type ResourceTree = (typeof i18nResources)[keyof typeof i18nResources]["translation"];
 
 const resolveFallback = (key: string, tree: ResourceTree | string | undefined): string | undefined => {
   if (typeof tree === "string") {
@@ -3136,10 +3280,10 @@ const resolveFallback = (key: string, tree: ResourceTree | string | undefined): 
 i18n
   .use(initReactI18next)
   .init({
-    resources,
+    resources: i18nResources,
     lng: "pl",
     fallbackLng: ["pl", "en"],
-    supportedLngs: ["pl", "en", "de"],
+    supportedLngs: ["pl", "en", "de", "uk"],
     defaultNS: "translation",
     interpolation: { escapeValue: false },
     returnNull: false,
