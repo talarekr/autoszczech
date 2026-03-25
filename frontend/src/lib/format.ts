@@ -4,6 +4,7 @@ const localeMap: Record<string, string> = {
   pl: "pl-PL",
   en: "en-GB",
   de: "de-DE",
+  uk: "uk-UA",
 };
 
 function currentLocale(): string {
