@@ -3102,10 +3102,105 @@ export const resources = {
   },
 } as const;
 
+const ukTranslation = {
+  ...resources.en.translation,
+  common: {
+    ...resources.en.translation.common,
+    languageSwitcherLabel: "Оберіть мову",
+    languages: {
+      ...resources.en.translation.common.languages,
+      pl: "Польська",
+      en: "Англійська",
+      de: "Німецька",
+      uk: "Українська",
+    },
+  },
+  nav: {
+    ...resources.en.translation.nav,
+    auctions: "Аукціони",
+    clientPanel: "Панель клієнта",
+    howToBuy: "Як купувати",
+    contact: "Контакт",
+    transportCalculator: "Калькулятор транспорту",
+    register: "Реєстрація",
+    login: "Увійти",
+    logout: "Вийти",
+    openMenu: "Відкрити меню",
+    closeMenu: "Закрити меню",
+    backHomeAria: "Повернутися на головну сторінку",
+    authMenuAria: "Відкрити меню входу та реєстрації",
+    loginAria: "Перейти до входу",
+  },
+  calculator: {
+    ...resources.en.translation.calculator,
+    heading: "Калькулятор курсів",
+    description: "Введіть суму в CHF, а калькулятор перерахує її в PLN.",
+    amountLabel: "Введіть суму",
+    amountPlaceholder: "Введіть суму",
+    amountAria: "Сума у швейцарських франках",
+    rateLabel: "Поточний курс НБП",
+    rateValueLabel: "1 CHF =",
+    rateSource: "Таблиця A НБП",
+    rateUpdated: "Оновлено: {{date}}",
+    rateLoading: "Завантаження поточного курсу…",
+    rateError: "Не вдалося завантажити курс. Використовується останнє збережене значення.",
+    resultLabel: "Сума після перерахунку",
+    resultPlaceholder: "—",
+  },
+  home: {
+    ...resources.en.translation.home,
+    hero: {
+      ...resources.en.translation.home.hero,
+      title: "Імпорт автомобілів прямо зі Швейцарії",
+      subtitle: "Знайдіть пропозиції авто, мотоциклів і спецтехніки від перевірених партнерів зі Швейцарії",
+      description: "Знайдіть пропозиції авто, мотоциклів і спецтехніки від перевірених партнерів з усієї Європи.",
+      points: {
+        ...resources.en.translation.home.hero.points,
+        access: "Доступ до аукціонів 24/7",
+        verified: "Перевірені постачальники та прозорі умови",
+        logistics: "Повний логістичний супровід і калькулятор транспорту",
+      },
+    },
+    search: {
+      ...resources.en.translation.home.search,
+      badge: "Пошук пропозицій",
+      title: "Знайдіть авто своєї мрії",
+      query: "Пошук за фразою, наприклад марка авто",
+      queryLabel: "Пошук за фразою, наприклад марка авто",
+      placeholder: "напр. Audi A4",
+      yearFrom: "Рік випуску від",
+      yearTo: "Рік випуску до",
+      provider: "Страхова компанія",
+      providerAny: "Будь-яка страхова компанія",
+      submit: "ЗНАЙТИ ПРОПОЗИЦІЇ",
+      reset: "Очистити фільтри",
+    },
+    listings: {
+      ...resources.en.translation.home.listings,
+      heading: "Актуальні аукціони",
+      subheading: "Переглядайте пропозиції перевірених постачальників.",
+      countLabel: "Кількість пропозицій",
+      sortLabel: "Сортувати:",
+      sort: {
+        ...resources.en.translation.home.listings.sort,
+        endingAsc: "Час завершення — за зростанням",
+        endingDesc: "Час завершення — за спаданням",
+        newest: "Найновіші",
+      },
+      loading: "Завантаження пропозицій…",
+      empty: "Немає пропозицій для заданих фільтрів.",
+    },
+    logoutSuccess: "Ви успішно вийшли з системи.",
+  },
+} as const;
+
 const i18nResources = {
   ...resources,
   uk: {
-    translation: resources.pl.translation,
+    translation: ukTranslation,
+  },
+  ua: {
+    translation: ukTranslation,
   },
 } as const;
 
@@ -3149,15 +3244,21 @@ i18n
     resources: i18nResources,
     lng: "pl",
     fallbackLng: ["pl", "en"],
-    supportedLngs: ["pl", "en", "de", "uk"],
+    supportedLngs: ["pl", "en", "de", "uk", "ua"],
     defaultNS: "translation",
     interpolation: { escapeValue: false },
     returnNull: false,
     initImmediate: false,
     react: { useSuspense: false },
     load: "languageOnly",
-    parseMissingKeyHandler: (key) =>
-      resolveFallback(key, resources.pl.translation) ?? key,
+    parseMissingKeyHandler: (key) => {
+      const currentLanguage = i18n.resolvedLanguage?.split("-")[0];
+      const fallbackTree =
+        currentLanguage === "uk" || currentLanguage === "ua"
+          ? resources.en.translation
+          : resources.pl.translation;
+      return resolveFallback(key, fallbackTree) ?? key;
+    },
   });
 
 export default i18n;
