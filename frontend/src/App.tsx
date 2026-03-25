@@ -16,6 +16,8 @@ const languageOrder: Array<{ code: string; flag: string }> = [
   { code: "uk", flag: "🇺🇦" },
 ];
 
+const normalizeLanguageCode = (code: string) => (code === "ua" ? "uk" : code);
+
 export default function App() {
   const { isLoggedIn, logout, userFirstName, userLastName, userEmail } = useAuth();
   const navigate = useNavigate();
@@ -25,6 +27,7 @@ export default function App() {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const authMenuRef = useRef<HTMLDivElement | null>(null);
   const location = useLocation();
+  const currentLanguage = normalizeLanguageCode(i18n.language.split("-")[0]);
 
   const languageOptions = languageOrder.map(({ code, flag }) => ({
     code,
@@ -209,8 +212,8 @@ export default function App() {
               </label>
               <select
                 id="language-select"
-                value={i18n.language.split("-")[0]}
-                onChange={(event) => i18n.changeLanguage(event.target.value)}
+                value={currentLanguage}
+                onChange={(event) => i18n.changeLanguage(normalizeLanguageCode(event.target.value))}
                 className="inline-flex items-center rounded-full border border-neutral-200 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 shadow-sm transition focus:border-red-300 focus:outline-none focus:ring-2 focus:ring-red-100"
               >
                 {languageOptions.map((option) => (
