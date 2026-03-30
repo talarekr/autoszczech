@@ -25,10 +25,12 @@ const normalizeImageUrls = (images?: CarImage[], apiBase?: string): CarImage[] =
   }
 
   const base = apiBase?.replace(/\/+$/, "") ?? "";
+  const toDetailVariant = (url: string) =>
+    url.endsWith(".thumb.webp") ? `${url.slice(0, -".thumb.webp".length)}.detail.webp` : url;
 
   return images
     .map((image) => {
-      const raw = image?.url?.trim();
+      const raw = toDetailVariant(image?.url?.trim() ?? "");
       if (!raw) return null;
 
       if (/^https?:\/\//i.test(raw)) {

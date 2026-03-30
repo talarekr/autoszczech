@@ -8,6 +8,8 @@ import { URL } from "node:url";
 import prisma from "../lib/prisma.js";
 import { importInsurancePayload } from "../lib/insuranceImporter.js";
 import { parseFtpEnvConfig, type FtpImporterConfig } from "../lib/ftpConfig.js";
+import { IMAGE_VARIANT_CONFIG, buildVariantRelativePath } from "../lib/imageVariants.js";
+import { createWebpVariant } from "../lib/imageProcessor.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -214,6 +216,29 @@ const ensureDir = async (dir: string) => {
   await fs.mkdir(dir, { recursive: true });
 };
 
+const generateImageVariants = async (
+  config: FtpImporterConfig,
+  buffer: Buffer,
+  sourceRelativePath: string
+) => {
+  const variants: Record<"thumb" | "detail", string> = {
+    thumb: buildVariantRelativePath(sourceRelativePath, "thumb"),
+    detail: buildVariantRelativePath(sourceRelativePath, "detail"),
+  };
+
+  await Promise.all(
+    (Object.keys(variants) as Array<keyof typeof variants>).map(async (variant) => {
+      const outputRelativePath = variants[variant];
+      const outputAbsolutePath = path.join(config.localImageDir, outputRelativePath);
+      await ensureDir(path.dirname(outputAbsolutePath));
+      const { width, quality } = IMAGE_VARIANT_CONFIG[variant];
+      await createWebpVariant(buffer, outputAbsolutePath, { width, quality });
+    })
+  );
+
+  return variants;
+};
+
 const resolveRestIdFromFilename = (filename?: string | null) => {
   if (!filename) return "";
   const match = filename.match(/offer_detail[_-]?(\d+)/i);
@@ -298,13 +323,12 @@ const normalizeImageEntries = async (
   await runWithConcurrency(downloadQueue, context.imageConcurrency, async ({ remoteName, index, safeFileName }) => {
     try {
       const buffer = await downloadRemoteFile(config, remoteName, config.imageDirectory);
-      const absolutePath = path.join(targetDir, safeFileName);
-      await fs.writeFile(absolutePath, buffer);
       const relativePath = path.posix.join(displaySegment, safeFileName);
+      const variants = await generateImageVariants(config, buffer, relativePath);
       successfulDownloads.push({
         index,
         originalName: remoteName,
-        relativePath,
+        relativePath: variants.detail,
       });
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));

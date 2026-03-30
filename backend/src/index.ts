@@ -102,7 +102,18 @@ const ftpConfig = parseFtpEnvConfig();
 mkdirSync(ftpConfig.localImageDir, { recursive: true });
 const publicImagePath = resolvePublicImagePath(ftpConfig.imageBaseUrl);
 const staticMountPath = publicImagePath.startsWith("/") ? publicImagePath : `/${publicImagePath}`;
-app.use(staticMountPath, express.static(path.resolve(ftpConfig.localImageDir)));
+app.use(
+  staticMountPath,
+  express.static(path.resolve(ftpConfig.localImageDir), {
+    immutable: true,
+    maxAge: "365d",
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith(".webp") || filePath.endsWith(".avif")) {
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      }
+    },
+  })
+);
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 app.use("/api/auth", authRoutes);
