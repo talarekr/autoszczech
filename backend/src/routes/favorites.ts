@@ -3,8 +3,20 @@ import { Prisma } from "@prisma/client";
 
 import prisma from "../lib/prisma.js";
 import { auth, AuthReq } from "../middleware/auth.js";
+import { toThumbVariantPath } from "../lib/imageVariants.js";
 
 const r = Router();
+
+const withThumbImages = <T extends { car?: { images?: { url: string }[] } }>(entry: T): T => {
+  if (!entry.car?.images) return entry;
+  return {
+    ...entry,
+    car: {
+      ...entry.car,
+      images: entry.car.images.map((image) => ({ ...image, url: toThumbVariantPath(image.url) })),
+    },
+  };
+};
 
 const resolveCarWhere = (carId?: string | number, displayId?: string | null): Prisma.CarWhereInput[] => {
   const parsedId = Number(carId);
@@ -37,7 +49,7 @@ r.get("/mine", auth("USER"), async (req: AuthReq, res: Response) => {
       orderBy: { createdAt: "desc" },
     });
 
-    res.json(favorites);
+    res.json(favorites.map(withThumbImages));
   } catch (error) {
     console.error("Nie udało się pobrać ulubionych", error);
     res.status(500).json({ error: "Nie udało się pobrać ulubionych" });
@@ -73,7 +85,7 @@ r.post("/", auth("USER"), async (req: AuthReq, res: Response) => {
     });
 
     if (existing) {
-      return res.status(200).json(existing);
+      return res.status(200).json(withThumbImages(existing));
     }
 
     const favorite = await prisma.favorite.create({
@@ -85,7 +97,7 @@ r.post("/", auth("USER"), async (req: AuthReq, res: Response) => {
       },
     });
 
-    res.json(favorite);
+    res.json(withThumbImages(favorite));
   } catch (error) {
     console.error("Nie udało się dodać do ulubionych", error);
     res.status(500).json({ error: "Nie udało się dodać do ulubionych" });
