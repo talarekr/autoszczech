@@ -6,6 +6,7 @@ import { Router, Request, Response } from "express";
 import prisma from "../lib/prisma.js";
 import { importInsurancePayload } from "../lib/insuranceImporter.js";
 import { auth } from "../middleware/auth.js";
+import { toDetailVariantPath, toThumbVariantPath } from "../lib/imageVariants.js";
 
 const COUNT_CACHE_TTL_MS = 10_000;
 const LIST_CACHE_TTL_MS = 20_000;
@@ -96,14 +97,6 @@ const parseOptionalPositiveInt = (value: unknown) => {
 
   const normalized = Math.floor(parsed);
   return normalized > 0 ? normalized : undefined;
-};
-
-const toThumbnailUrl = (url: string) => {
-  const trimmed = url.trim();
-  if (!trimmed) return trimmed;
-  if (!/^https?:\/\//i.test(trimmed)) return trimmed;
-  if (trimmed.includes("w=")) return trimmed;
-  return `${trimmed}${trimmed.includes("?") ? "&" : "?"}w=400`;
 };
 
 const normalizeSort = (value: unknown): SortOption => {
@@ -250,7 +243,7 @@ r.get("/", async (req: Request, res: Response) => {
 
     return {
       ...car,
-      images: [{ ...firstImage, url: toThumbnailUrl(firstImage.url) }],
+      images: [{ ...firstImage, url: toThumbVariantPath(firstImage.url) }],
     };
   });
 
@@ -334,13 +327,18 @@ r.get("/:id", async (req: Request, res: Response) => {
 
     if (!car) return res.status(404).json({ error: "Nie znaleziono pojazdu" });
 
+    const normalizedCar = {
+      ...car,
+      images: car.images.map((image) => ({ ...image, url: toDetailVariantPath(image.url) })),
+    };
+
     const offers = await prisma.offer.findMany({
       where: { carId: car.id },
       include: { user: { select: { id: true, email: true } } },
       orderBy: { createdAt: "desc" },
     });
 
-    res.json({ ...car, offers });
+    res.json({ ...normalizedCar, offers });
   } catch (error) {
     console.error("Błąd podczas pobierania pojazdu:", error);
     res.status(500).json({ error: "Błąd serwera" });

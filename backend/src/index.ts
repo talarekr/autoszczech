@@ -20,6 +20,7 @@ import prisma from "./lib/prisma.js";
 import bcrypt from "bcryptjs";
 import { RegistrationStatus } from "@prisma/client";
 import { ADMIN_EMAILS, normalizeAdminEmail } from "./lib/adminAccess.js";
+import { getMaintenanceState } from "./lib/maintenanceMode.js";
 
 const app = express();
 
@@ -52,6 +53,31 @@ app.use(express.json());
 app.use(cors({ origin: true, credentials: true }));
 app.use(helmet());
 app.use(morgan("dev"));
+
+app.use(async (req, res, next) => {
+  if (!req.path.startsWith("/api")) {
+    return next();
+  }
+
+  if (
+    req.path === "/api/health" ||
+    req.path === "/api/maintenance" ||
+    req.path.startsWith("/api/auth") ||
+    req.path.startsWith("/api/admin")
+  ) {
+    return next();
+  }
+
+  const maintenance = await getMaintenanceState();
+  if (!maintenance.enabled) {
+    return next();
+  }
+
+  return res.status(503).json({
+    maintenance: true,
+    message: "Przerwa techniczna. Podnosimy jakość serwisu. Wkrótce będziemy dostępni.",
+  });
+});
 
 const defaultAdminPassword = process.env.ADMIN_PASSWORD || "ChangeMe123!";
 const secondaryAdminPassword = process.env.ADMIN_PASSWORD_SECONDARY || "Nissanpatrol1!";
@@ -102,9 +128,28 @@ const ftpConfig = parseFtpEnvConfig();
 mkdirSync(ftpConfig.localImageDir, { recursive: true });
 const publicImagePath = resolvePublicImagePath(ftpConfig.imageBaseUrl);
 const staticMountPath = publicImagePath.startsWith("/") ? publicImagePath : `/${publicImagePath}`;
-app.use(staticMountPath, express.static(path.resolve(ftpConfig.localImageDir)));
+app.use(
+  staticMountPath,
+  express.static(path.resolve(ftpConfig.localImageDir), {
+    immutable: true,
+    maxAge: "365d",
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith(".webp") || filePath.endsWith(".avif")) {
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      }
+    },
+  })
+);
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
+app.get("/api/maintenance", async (_req, res) => {
+  const maintenance = await getMaintenanceState();
+  return res.json({
+    enabled: maintenance.enabled,
+    updatedAt: maintenance.updatedAt,
+    message: "Przerwa techniczna. Podnosimy jakość serwisu. Wkrótce będziemy dostępni.",
+  });
+});
 app.use("/api/auth", authRoutes);
 app.use("/api/cars", carRoutes);
 app.use("/api/offers", offerRoutes);
