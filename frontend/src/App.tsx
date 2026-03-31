@@ -19,6 +19,7 @@ const languageOrder: Array<{ code: string; flag: string }> = [
 ];
 
 const normalizeLanguageCode = (code: string) => (code === "ua" ? "uk" : code);
+const FORCE_MAINTENANCE_MODE = true;
 
 export default function App() {
   const { isLoggedIn, logout, userFirstName, userLastName, userEmail, userRole } = useAuth();
