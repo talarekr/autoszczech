@@ -31,8 +31,8 @@ export default function App() {
   const authMenuRef = useRef<HTMLDivElement | null>(null);
   const location = useLocation();
   const currentLanguage = normalizeLanguageCode(i18n.language.split("-")[0]);
-  const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
-  const [maintenanceChecked, setMaintenanceChecked] = useState(false);
+  const [maintenanceEnabled, setMaintenanceEnabled] = useState(FORCE_MAINTENANCE_MODE);
+  const [maintenanceChecked, setMaintenanceChecked] = useState(FORCE_MAINTENANCE_MODE);
 
   const languageOptions = languageOrder.map(({ code, flag }) => ({
     code,
@@ -76,6 +76,12 @@ export default function App() {
   }, [location.pathname]);
 
   useEffect(() => {
+    if (FORCE_MAINTENANCE_MODE) {
+      setMaintenanceEnabled(true);
+      setMaintenanceChecked(true);
+      return;
+    }
+
     let active = true;
     void (async () => {
       try {
@@ -87,7 +93,7 @@ export default function App() {
         setMaintenanceEnabled(response.data?.enabled === true);
       } catch {
         if (!active) return;
-        setMaintenanceEnabled(false);
+        setMaintenanceEnabled(true);
       } finally {
         if (active) {
           setMaintenanceChecked(true);
