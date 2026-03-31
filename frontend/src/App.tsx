@@ -19,7 +19,7 @@ const languageOrder: Array<{ code: string; flag: string }> = [
 ];
 
 const normalizeLanguageCode = (code: string) => (code === "ua" ? "uk" : code);
-const FORCE_MAINTENANCE_MODE = false;
+const FORCE_MAINTENANCE_MODE = true;
 
 export default function App() {
   const { isLoggedIn, logout, userFirstName, userLastName, userEmail, userRole } = useAuth();
@@ -31,7 +31,7 @@ export default function App() {
   const authMenuRef = useRef<HTMLDivElement | null>(null);
   const location = useLocation();
   const currentLanguage = normalizeLanguageCode(i18n.language.split("-")[0]);
-  const [maintenanceEnabled, setMaintenanceEnabled] = useState(true);
+  const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
   const [maintenanceChecked, setMaintenanceChecked] = useState(false);
 
   const languageOptions = languageOrder.map(({ code, flag }) => ({
@@ -87,7 +87,7 @@ export default function App() {
         setMaintenanceEnabled(response.data?.enabled === true);
       } catch {
         if (!active) return;
-        setMaintenanceEnabled(true);
+        setMaintenanceEnabled(false);
       } finally {
         if (active) {
           setMaintenanceChecked(true);
@@ -100,10 +100,7 @@ export default function App() {
     };
   }, []);
 
-  const shouldShowMaintenance =
-    FORCE_MAINTENANCE_MODE || (userRole !== "ADMIN" && (!maintenanceChecked || maintenanceEnabled));
-
-  if (shouldShowMaintenance) {
+  if (maintenanceChecked && maintenanceEnabled && userRole !== "ADMIN") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-neutral-100 px-6">
         <div className="w-full max-w-2xl rounded-3xl border border-neutral-200 bg-white p-10 text-center shadow-lg shadow-black/5">
