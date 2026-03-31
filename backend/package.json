@@ -13,7 +13,8 @@
     "start:prod": "npm run prisma:migrate && node dist/backend/src/start.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
-    "prisma:seed": "node prisma/seed.mjs"
+    "prisma:seed": "node prisma/seed.mjs",
+    "images:migrate-variants": "node scripts/migrate-image-variants.mjs"
   },
   "dependencies": {
     "@prisma/client": "^5.18.0",
