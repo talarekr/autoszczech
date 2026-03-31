@@ -100,7 +100,7 @@ export default function App() {
     };
   }, []);
 
-  if (FORCE_MAINTENANCE_MODE || (maintenanceChecked && maintenanceEnabled && userRole !== "ADMIN")) {
+  if (maintenanceChecked && maintenanceEnabled && userRole !== "ADMIN") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-neutral-100 px-6">
         <div className="w-full max-w-2xl rounded-3xl border border-neutral-200 bg-white p-10 text-center shadow-lg shadow-black/5">
