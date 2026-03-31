@@ -4,8 +4,21 @@ import { Prisma, WinnerStatus } from "@prisma/client";
 import prisma from "../lib/prisma.js";
 import { auth, AuthReq } from "../middleware/auth.js";
 import { sendAuctionAwardedEmail, sendAuctionWinnerEmail, sendBidPlacedEmails } from "../lib/mailer.js";
+import { toThumbVariantPath } from "../lib/imageVariants.js";
 
 const r = Router();
+
+const withThumbs = <T extends { car?: { images?: { url: string }[] } }>(rows: T[]) =>
+  rows.map((row) => {
+    if (!row.car?.images) return row;
+    return {
+      ...row,
+      car: {
+        ...row.car,
+        images: row.car.images.map((image) => ({ ...image, url: toThumbVariantPath(image.url) })),
+      },
+    };
+  });
 
 // Składanie oferty przez zalogowanego użytkownika
 r.post("/", auth("USER"), async (req: AuthReq, res: Response) => {
@@ -112,7 +125,7 @@ r.get("/mine", auth("USER"), async (req: AuthReq, res: Response) => {
       orderBy: { createdAt: "desc" },
     });
 
-    res.json(offers);
+    res.json(withThumbs(offers));
   } catch (error) {
     console.error("Nie udało się pobrać ofert użytkownika", error);
     res.status(500).json({ error: "Nie udało się pobrać ofert" });
