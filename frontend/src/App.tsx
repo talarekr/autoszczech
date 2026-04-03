@@ -19,8 +19,6 @@ const languageOrder: Array<{ code: string; flag: string }> = [
 ];
 
 const normalizeLanguageCode = (code: string) => (code === "ua" ? "uk" : code);
-const FORCE_MAINTENANCE_MODE = true;
-
 export default function App() {
   const { isLoggedIn, logout, userFirstName, userLastName, userEmail, userRole } = useAuth();
   const navigate = useNavigate();
@@ -49,16 +47,6 @@ export default function App() {
     if (userEmail) return userEmail.trim().charAt(0).toUpperCase();
     return "?";
   })();
-
-  if (!isReady) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-neutral-100 text-neutral-500">
-        <span className="animate-pulse text-sm font-semibold uppercase tracking-[0.4em]">
-          AUTOSZCZECH
-        </span>
-      </div>
-    );
-  }
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -99,6 +87,16 @@ export default function App() {
       active = false;
     };
   }, []);
+
+  if (!isReady) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-neutral-100 text-neutral-500">
+        <span className="animate-pulse text-sm font-semibold uppercase tracking-[0.4em]">
+          AUTOSZCZECH
+        </span>
+      </div>
+    );
+  }
 
   if (maintenanceChecked && maintenanceEnabled && userRole !== "ADMIN") {
     return (
