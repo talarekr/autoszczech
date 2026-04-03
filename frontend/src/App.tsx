@@ -1,12 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
-import axios from "axios";
 
 import { useTranslation } from "react-i18next";
 
 import { ChfPlnCalculator } from "./components/ChfPlnCalculator";
 import { useAuth } from "./contexts/AuthContext";
-import { getApiUrl } from "./lib/api";
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   `text-sm font-medium transition-colors duration-150 ${isActive ? "text-red-600" : "text-neutral-500 hover:text-neutral-800"}`;
@@ -19,10 +17,8 @@ const languageOrder: Array<{ code: string; flag: string }> = [
 ];
 
 const normalizeLanguageCode = (code: string) => (code === "ua" ? "uk" : code);
-const FORCE_MAINTENANCE_MODE = true;
-
 export default function App() {
-  const { isLoggedIn, logout, userFirstName, userLastName, userEmail, userRole } = useAuth();
+  const { isLoggedIn, logout, userFirstName, userLastName, userEmail } = useAuth();
   const navigate = useNavigate();
   const { t, i18n, ready } = useTranslation();
   const isReady = ready && i18n.isInitialized;
@@ -31,8 +27,6 @@ export default function App() {
   const authMenuRef = useRef<HTMLDivElement | null>(null);
   const location = useLocation();
   const currentLanguage = normalizeLanguageCode(i18n.language.split("-")[0]);
-  const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
-  const [maintenanceChecked, setMaintenanceChecked] = useState(false);
 
   const languageOptions = languageOrder.map(({ code, flag }) => ({
     code,
@@ -50,16 +44,6 @@ export default function App() {
     return "?";
   })();
 
-  if (!isReady) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-neutral-100 text-neutral-500">
-        <span className="animate-pulse text-sm font-semibold uppercase tracking-[0.4em]">
-          AUTOSZCZECH
-        </span>
-      </div>
-    );
-  }
-
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (authMenuRef.current && !authMenuRef.current.contains(event.target as Node)) {
@@ -75,41 +59,12 @@ export default function App() {
     setIsMobileNavOpen(false);
   }, [location.pathname]);
 
-  useEffect(() => {
-    let active = true;
-    void (async () => {
-      try {
-        const apiUrl = await getApiUrl();
-        const response = await axios.get<{ enabled?: boolean }>(`${apiUrl}/api/maintenance`, {
-          timeout: 5000,
-        });
-        if (!active) return;
-        setMaintenanceEnabled(response.data?.enabled === true);
-      } catch {
-        if (!active) return;
-        setMaintenanceEnabled(false);
-      } finally {
-        if (active) {
-          setMaintenanceChecked(true);
-        }
-      }
-    })();
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  if (maintenanceChecked && maintenanceEnabled && userRole !== "ADMIN") {
+  if (!isReady) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-neutral-100 px-6">
-        <div className="w-full max-w-2xl rounded-3xl border border-neutral-200 bg-white p-10 text-center shadow-lg shadow-black/5">
-          <p className="text-sm font-semibold uppercase tracking-[0.35em] text-red-500">AutoSzczech</p>
-          <h1 className="mt-4 text-3xl font-semibold text-neutral-900">Przerwa techniczna</h1>
-          <p className="mt-4 text-lg text-neutral-600">
-            Podnosimy jakość serwisu. Wkrótce będziemy dostępni.
-          </p>
-        </div>
+      <div className="flex min-h-screen items-center justify-center bg-neutral-100 text-neutral-500">
+        <span className="animate-pulse text-sm font-semibold uppercase tracking-[0.4em]">
+          AUTOSZCZECH
+        </span>
       </div>
     );
   }

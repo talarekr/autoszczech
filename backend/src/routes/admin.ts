@@ -4,7 +4,6 @@ import { Prisma, RegistrationStatus } from "@prisma/client";
 import prisma from "../lib/prisma.js";
 import { auth } from "../middleware/auth.js";
 import { sendAccountApprovedEmail } from "../lib/mailer.js";
-import { getMaintenanceState, setMaintenanceMode } from "../lib/maintenanceMode.js";
 
 const insurers = ["AXA", "ALLIANZ", "SCC", "BEST", "REST"] as const;
 
@@ -17,21 +16,6 @@ const normalizeProvider = (value: unknown): Insurer | undefined => {
 };
 
 const r = Router();
-
-r.get("/maintenance", auth("ADMIN"), async (_req: Request, res: Response) => {
-  const state = await getMaintenanceState();
-  res.json(state);
-});
-
-r.patch("/maintenance", auth("ADMIN"), async (req: Request, res: Response) => {
-  const enabled = req.body?.enabled;
-  if (typeof enabled !== "boolean") {
-    return res.status(400).json({ error: "Pole enabled musi być typu boolean" });
-  }
-
-  const state = await setMaintenanceMode(enabled);
-  return res.json(state);
-});
 
 r.get("/auctions", auth("ADMIN"), async (req: Request, res: Response) => {
   const provider = normalizeProvider(req.query.provider);

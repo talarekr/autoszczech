@@ -58,10 +58,6 @@ export default function Admin() {
   const [wonAuctions, setWonAuctions] = useState<WonAuction[]>([]);
   const [wonAuctionsLoading, setWonAuctionsLoading] = useState(false);
   const [wonAuctionsError, setWonAuctionsError] = useState<string | null>(null);
-  const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
-  const [maintenanceLoading, setMaintenanceLoading] = useState(false);
-  const [maintenanceSaving, setMaintenanceSaving] = useState(false);
-  const [maintenanceError, setMaintenanceError] = useState<string | null>(null);
 
   const isAdmin = isLoggedIn && userRole === "ADMIN";
 
@@ -147,45 +143,6 @@ export default function Admin() {
     }
   };
 
-  const fetchMaintenanceState = async () => {
-    if (!token || !isAdmin) return;
-    setMaintenanceLoading(true);
-    setMaintenanceError(null);
-
-    try {
-      const apiUrl = await getApiUrl();
-      const response = await axios.get<{ enabled?: boolean }>(`${apiUrl}/api/admin/maintenance`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setMaintenanceEnabled(response.data?.enabled === true);
-    } catch (err) {
-      console.error("Nie udało się pobrać statusu przerwy technicznej", err);
-      setMaintenanceError("Nie udało się pobrać statusu przerwy technicznej.");
-    } finally {
-      setMaintenanceLoading(false);
-    }
-  };
-
-  const toggleMaintenance = async (enabled: boolean) => {
-    if (!token || !isAdmin) return;
-    setMaintenanceSaving(true);
-    setMaintenanceError(null);
-
-    try {
-      const apiUrl = await getApiUrl();
-      const response = await axios.patch<{ enabled?: boolean }>(
-        `${apiUrl}/api/admin/maintenance`,
-        { enabled },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setMaintenanceEnabled(response.data?.enabled === true);
-    } catch (err) {
-      console.error("Nie udało się zapisać statusu przerwy technicznej", err);
-      setMaintenanceError("Nie udało się zapisać statusu przerwy technicznej.");
-    } finally {
-      setMaintenanceSaving(false);
-    }
-  };
 
   const fetchPendingUsers = async () => {
     if (!token || !isAdmin) {
@@ -445,12 +402,6 @@ export default function Admin() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSection, token, isAdmin]);
 
-  useEffect(() => {
-    if (!isAdmin) return;
-    fetchMaintenanceState();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin, token]);
-
   const handleSetWinner = async (carId: number, offerId: number, status: WinnerStatus) => {
     if (!token || !isAdmin) return;
     setSaving({ carId, offerId, status });
@@ -594,47 +545,6 @@ export default function Admin() {
         <h1 className="text-3xl font-semibold text-neutral-900">{t("admin.bids.title")}</h1>
         <p className="text-neutral-600">{t("admin.bids.description")}</p>
       </header>
-
-      <section className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-neutral-500">Utrzymanie serwisu</p>
-            <h2 className="mt-1 text-lg font-semibold text-neutral-900">Przerwa techniczna</h2>
-            <p className="text-sm text-neutral-600">
-              Po włączeniu użytkownicy zobaczą: „Przerwa techniczna. Podnosimy jakość serwisu. Wkrótce będziemy
-              dostępni.”
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <span
-              className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] ring-1 ${
-                maintenanceEnabled
-                  ? "bg-amber-50 text-amber-800 ring-amber-200"
-                  : "bg-emerald-50 text-emerald-700 ring-emerald-200"
-              }`}
-            >
-              {maintenanceEnabled ? "WŁĄCZONA" : "WYŁĄCZONA"}
-            </span>
-            <button
-              type="button"
-              onClick={() => toggleMaintenance(!maintenanceEnabled)}
-              disabled={maintenanceLoading || maintenanceSaving}
-              className={`inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-white shadow-sm transition disabled:opacity-70 ${
-                maintenanceEnabled ? "bg-neutral-900 hover:bg-neutral-800" : "bg-red-600 hover:bg-red-700"
-              }`}
-            >
-              {maintenanceLoading
-                ? "Ładowanie..."
-                : maintenanceSaving
-                  ? "Zapisywanie..."
-                  : maintenanceEnabled
-                    ? "Wyłącz przerwę"
-                    : "Włącz przerwę"}
-            </button>
-          </div>
-        </div>
-        {maintenanceError ? <p className="mt-3 text-sm text-red-700">{maintenanceError}</p> : null}
-      </section>
 
       <section className="space-y-4 rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-center gap-3">
