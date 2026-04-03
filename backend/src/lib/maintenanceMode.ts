@@ -7,7 +7,7 @@ type MaintenanceState = {
 };
 
 const defaultState: MaintenanceState = {
-  enabled: false,
+  enabled: true,
   updatedAt: null,
 };
 
