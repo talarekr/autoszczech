@@ -1,12 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
-import axios from "axios";
 
 import { useTranslation } from "react-i18next";
 
 import { ChfPlnCalculator } from "./components/ChfPlnCalculator";
 import { useAuth } from "./contexts/AuthContext";
-import { getApiUrl } from "./lib/api";
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   `text-sm font-medium transition-colors duration-150 ${isActive ? "text-red-600" : "text-neutral-500 hover:text-neutral-800"}`;
@@ -20,7 +18,7 @@ const languageOrder: Array<{ code: string; flag: string }> = [
 
 const normalizeLanguageCode = (code: string) => (code === "ua" ? "uk" : code);
 export default function App() {
-  const { isLoggedIn, logout, userFirstName, userLastName, userEmail, userRole } = useAuth();
+  const { isLoggedIn, logout, userFirstName, userLastName, userEmail } = useAuth();
   const navigate = useNavigate();
   const { t, i18n, ready } = useTranslation();
   const isReady = ready && i18n.isInitialized;
@@ -106,14 +104,10 @@ export default function App() {
 
   if (maintenanceChecked && maintenanceEnabled && userRole !== "ADMIN") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-neutral-100 px-6">
-        <div className="w-full max-w-2xl rounded-3xl border border-neutral-200 bg-white p-10 text-center shadow-lg shadow-black/5">
-          <p className="text-sm font-semibold uppercase tracking-[0.35em] text-red-500">AutoSzczech</p>
-          <h1 className="mt-4 text-3xl font-semibold text-neutral-900">Przerwa techniczna</h1>
-          <p className="mt-4 text-lg text-neutral-600">
-            Podnosimy jakość serwisu. Wkrótce będziemy dostępni.
-          </p>
-        </div>
+      <div className="flex min-h-screen items-center justify-center bg-neutral-100 text-neutral-500">
+        <span className="animate-pulse text-sm font-semibold uppercase tracking-[0.4em]">
+          AUTOSZCZECH
+        </span>
       </div>
     );
   }
