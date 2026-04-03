@@ -48,16 +48,6 @@ export default function App() {
     return "?";
   })();
 
-  if (!isReady) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-neutral-100 text-neutral-500">
-        <span className="animate-pulse text-sm font-semibold uppercase tracking-[0.4em]">
-          AUTOSZCZECH
-        </span>
-      </div>
-    );
-  }
-
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (authMenuRef.current && !authMenuRef.current.contains(event.target as Node)) {
@@ -103,6 +93,16 @@ export default function App() {
       active = false;
     };
   }, []);
+
+  if (!isReady) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-neutral-100 text-neutral-500">
+        <span className="animate-pulse text-sm font-semibold uppercase tracking-[0.4em]">
+          AUTOSZCZECH
+        </span>
+      </div>
+    );
+  }
 
   if (maintenanceChecked && maintenanceEnabled && userRole !== "ADMIN") {
     return (
