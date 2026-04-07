@@ -232,7 +232,7 @@ const generateImageVariants = async (
       const outputAbsolutePath = path.join(config.localImageDir, outputRelativePath);
       await ensureDir(path.dirname(outputAbsolutePath));
       const { width, quality } = IMAGE_VARIANT_CONFIG[variant];
-      await createWebpVariant(buffer, outputAbsolutePath, { width, quality });
+      await createWebpVariant(buffer, outputAbsolutePath, { width, quality, variant });
     })
   );
 
