@@ -30,6 +30,19 @@ const ensureDir = async (filePath: string) => {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
 };
 
+const loadSharp = async () => {
+  if (!sharpLoader) {
+    const moduleName = "sharp";
+    sharpLoader = import(moduleName)
+      .then((module) => {
+        const factory = (module as { default?: unknown }).default;
+        return typeof factory === "function" ? (factory as (input: Buffer) => any) : null;
+      })
+      .catch(() => null);
+  }
+  return sharpLoader;
+};
+
 export const createWebpVariant = async (
   sourceBuffer: Buffer,
   outputAbsolutePath: string,
@@ -98,4 +111,7 @@ export const createWebpVariant = async (
   await fs.writeFile(outputAbsolutePath, bestOutput);
 };
 
-export const getImageProcessorInfo = async () => ({ tool: await detectTool() });
+export const getImageProcessorInfo = async () => ({
+  tool: await detectTool(),
+  sharpAvailable: Boolean(await loadSharp()),
+});
