@@ -3,7 +3,7 @@ import path from "node:path";
 export type ImageVariant = "thumb" | "detail";
 
 export const IMAGE_VARIANT_CONFIG: Record<ImageVariant, { width: number; quality: number }> = {
-  thumb: { width: 400, quality: 68 },
+  thumb: { width: 320, quality: 60 },
   detail: { width: 1200, quality: 78 },
 };
 
@@ -32,7 +32,7 @@ export const toThumbVariantPath = (imageUrl: string) => {
 
   if (/^https?:\/\//i.test(trimmed)) {
     if (trimmed.includes("w=")) return trimmed;
-    return `${trimmed}${trimmed.includes("?") ? "&" : "?"}w=400`;
+    return `${trimmed}${trimmed.includes("?") ? "&" : "?"}w=320`;
   }
 
   return buildVariantRelativePath(trimmed, "thumb");
