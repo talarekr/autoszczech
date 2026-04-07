@@ -10,6 +10,12 @@ let detectedTool: "cwebp" | "none" | null = null;
 const THUMB_SOFT_MAX_BYTES = 100 * 1024;
 const THUMB_RETRY_MAX_BYTES = 120 * 1024;
 const THUMB_HARD_MAX_BYTES = 300 * 1024;
+type SharpFactory = (input: Buffer) => {
+  resize: (options: { width: number; withoutEnlargement: boolean }) => {
+    webp: (options: { quality: number }) => { toBuffer: () => Promise<Buffer> };
+  };
+};
+let sharpLoader: Promise<SharpFactory | null> | null = null;
 
 const hasBinary = async (name: string) => {
   try {
@@ -36,7 +42,7 @@ const loadSharp = async () => {
     sharpLoader = import(moduleName)
       .then((module) => {
         const factory = (module as { default?: unknown }).default;
-        return typeof factory === "function" ? (factory as (input: Buffer) => any) : null;
+        return typeof factory === "function" ? (factory as SharpFactory) : null;
       })
       .catch(() => null);
   }
@@ -86,14 +92,25 @@ export const createWebpVariant = async (
   };
 
   const tool = await detectTool();
-  if (tool !== "cwebp") {
-    throw new Error("Brak cwebp w środowisku — nie można bezpiecznie generować lekkich miniatur.");
-  }
+  const sharpFactory = tool === "cwebp" ? null : await loadSharp();
+
+  const renderWithSharp = async (width: number, quality: number) => {
+    if (!sharpFactory) {
+      throw new Error("Brak cwebp i sharp w środowisku — nie można wygenerować obrazów WebP.");
+    }
+    return sharpFactory(sourceBuffer)
+      .resize({ width, withoutEnlargement: true })
+      .webp({ quality })
+      .toBuffer();
+  };
 
   let bestOutput: Buffer | null = null;
 
   for (const attempt of attempts) {
-    const output = await renderWithCwebp(attempt.width, attempt.quality);
+    const output =
+      tool === "cwebp"
+        ? await renderWithCwebp(attempt.width, attempt.quality)
+        : await renderWithSharp(attempt.width, attempt.quality);
     bestOutput = output;
     if (!isThumb) break;
     if (output.length <= THUMB_SOFT_MAX_BYTES) break;
