@@ -31,7 +31,7 @@ type CarsCountResponse = {
 };
 
 const FIRST_BATCH_SIZE = 50;
-const BACKGROUND_BATCH_SIZE = 150;
+const BACKGROUND_BATCH_SIZE = 50;
 
 const parseSortOption = (value: string | null): SortOption => {
   if (value === "endingAsc" || value === "endingDesc" || value === "newest") {

@@ -20,6 +20,7 @@ import prisma from "./lib/prisma.js";
 import bcrypt from "bcryptjs";
 import { RegistrationStatus } from "@prisma/client";
 import { ADMIN_EMAILS, normalizeAdminEmail } from "./lib/adminAccess.js";
+import { getImageProcessorInfo } from "./lib/imageProcessor.js";
 
 const app = express();
 
@@ -116,6 +117,10 @@ app.use(
 );
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
+app.get("/api/diagnostics/image-processor", async (_req, res) => {
+  const info = await getImageProcessorInfo();
+  res.json(info);
+});
 app.use("/api/auth", authRoutes);
 app.use("/api/cars", carRoutes);
 app.use("/api/offers", offerRoutes);
@@ -131,6 +136,15 @@ const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`✅ API running on port: ${PORT}`);
 });
+
+getImageProcessorInfo()
+  .then(({ tool, sharpAvailable }) => {
+    const cwebpAvailable = tool === "cwebp";
+    console.info(`[image-processor] cwebp=${cwebpAvailable}, sharp=${sharpAvailable}`);
+  })
+  .catch((error) => {
+    console.warn("[image-processor] Failed to detect available processors", error);
+  });
 
 const ftpEnabled = (process.env.FTP_IMPORT_ENABLED ?? "true").toLowerCase() === "true";
 if (ftpEnabled) {

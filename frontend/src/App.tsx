@@ -27,9 +27,6 @@ export default function App() {
   const authMenuRef = useRef<HTMLDivElement | null>(null);
   const location = useLocation();
   const currentLanguage = normalizeLanguageCode(i18n.language.split("-")[0]);
-  const [maintenanceEnabled, setMaintenanceEnabled] = useState(FORCE_MAINTENANCE_MODE);
-  const [maintenanceChecked, setMaintenanceChecked] = useState(FORCE_MAINTENANCE_MODE);
-
   const languageOptions = languageOrder.map(({ code, flag }) => ({
     code,
     flag,
@@ -61,48 +58,7 @@ export default function App() {
     setIsMobileNavOpen(false);
   }, [location.pathname]);
 
-  useEffect(() => {
-    if (FORCE_MAINTENANCE_MODE) {
-      setMaintenanceEnabled(true);
-      setMaintenanceChecked(true);
-      return;
-    }
-
-    let active = true;
-    void (async () => {
-      try {
-        const apiUrl = await getApiUrl();
-        const response = await axios.get<{ enabled?: boolean }>(`${apiUrl}/api/maintenance`, {
-          timeout: 5000,
-        });
-        if (!active) return;
-        setMaintenanceEnabled(response.data?.enabled === true);
-      } catch {
-        if (!active) return;
-        setMaintenanceEnabled(true);
-      } finally {
-        if (active) {
-          setMaintenanceChecked(true);
-        }
-      }
-    })();
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
   if (!isReady) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-neutral-100 text-neutral-500">
-        <span className="animate-pulse text-sm font-semibold uppercase tracking-[0.4em]">
-          AUTOSZCZECH
-        </span>
-      </div>
-    );
-  }
-
-  if (maintenanceChecked && maintenanceEnabled && userRole !== "ADMIN") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-neutral-100 text-neutral-500">
         <span className="animate-pulse text-sm font-semibold uppercase tracking-[0.4em]">
