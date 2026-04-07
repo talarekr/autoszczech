@@ -10,9 +10,6 @@ let detectedTool: "cwebp" | "none" | null = null;
 const THUMB_SOFT_MAX_BYTES = 100 * 1024;
 const THUMB_RETRY_MAX_BYTES = 120 * 1024;
 const THUMB_HARD_MAX_BYTES = 300 * 1024;
-const processorCache: { sharpLoader: Promise<null | ((input: Buffer) => any)> | null } = {
-  sharpLoader: null,
-};
 
 const hasBinary = async (name: string) => {
   try {
@@ -34,16 +31,16 @@ const ensureDir = async (filePath: string) => {
 };
 
 const loadSharp = async () => {
-  if (!processorCache.sharpLoader) {
+  if (!sharpLoader) {
     const moduleName = "sharp";
-    processorCache.sharpLoader = import(moduleName)
+    sharpLoader = import(moduleName)
       .then((module) => {
         const factory = (module as { default?: unknown }).default;
         return typeof factory === "function" ? (factory as (input: Buffer) => any) : null;
       })
       .catch(() => null);
   }
-  return processorCache.sharpLoader;
+  return sharpLoader;
 };
 
 export const createWebpVariant = async (
@@ -89,24 +86,14 @@ export const createWebpVariant = async (
   };
 
   const tool = await detectTool();
-  const sharpFactory = tool === "cwebp" ? null : await loadSharp();
+  if (tool !== "cwebp") {
+    throw new Error("Brak cwebp w środowisku — nie można bezpiecznie generować lekkich miniatur.");
+  }
 
   let bestOutput: Buffer | null = null;
 
   for (const attempt of attempts) {
-    const output =
-      tool === "cwebp"
-        ? await renderWithCwebp(attempt.width, attempt.quality)
-        : sharpFactory
-        ? await sharpFactory(sourceBuffer)
-            .rotate()
-            .resize({ width: attempt.width, fit: "inside", withoutEnlargement: true })
-            .webp({ quality: attempt.quality, effort: 6 })
-            .toBuffer()
-        : null;
-    if (!output) {
-      throw new Error("Brak cwebp i brak sharp — nie można wygenerować wariantu WebP.");
-    }
+    const output = await renderWithCwebp(attempt.width, attempt.quality);
     bestOutput = output;
     if (!isThumb) break;
     if (output.length <= THUMB_SOFT_MAX_BYTES) break;
