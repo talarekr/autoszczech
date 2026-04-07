@@ -7,6 +7,9 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 
 let detectedTool: "cwebp" | "none" | null = null;
+const THUMB_SOFT_MAX_BYTES = 100 * 1024;
+const THUMB_RETRY_MAX_BYTES = 120 * 1024;
+const THUMB_HARD_MAX_BYTES = 300 * 1024;
 
 const hasBinary = async (name: string) => {
   try {
@@ -30,36 +33,69 @@ const ensureDir = async (filePath: string) => {
 export const createWebpVariant = async (
   sourceBuffer: Buffer,
   outputAbsolutePath: string,
-  options: { width: number; quality: number }
+  options: { width: number; quality: number; variant: "thumb" | "detail" }
 ) => {
   await ensureDir(outputAbsolutePath);
-  const tool = await detectTool();
+  const isThumb = options.variant === "thumb";
+  const attempts = isThumb
+    ? [
+        { width: Math.min(options.width, 320), quality: Math.min(options.quality, 60) },
+        { width: 300, quality: 55 },
+        { width: 280, quality: 50 },
+      ]
+    : [{ width: options.width, quality: options.quality }];
 
-  if (tool === "cwebp") {
+  const renderWithCwebp = async (width: number, quality: number) => {
     const tmpInput = path.join(os.tmpdir(), `autoszczech-${Date.now()}-${Math.random().toString(36).slice(2)}.img`);
+    const tmpOutput = path.join(os.tmpdir(), `autoszczech-${Date.now()}-${Math.random().toString(36).slice(2)}.webp`);
     await fs.writeFile(tmpInput, sourceBuffer);
 
     try {
       await execFileAsync("cwebp", [
         "-quiet",
+        "-metadata",
+        "none",
         "-q",
-        String(options.quality),
+        String(quality),
         "-resize",
-        String(options.width),
+        String(width),
         "0",
         tmpInput,
         "-o",
-        outputAbsolutePath,
+        tmpOutput,
       ]);
-      return;
+      const output = await fs.readFile(tmpOutput);
+      return output;
     } finally {
       await fs.unlink(tmpInput).catch(() => undefined);
+      await fs.unlink(tmpOutput).catch(() => undefined);
     }
+  };
+
+  const tool = await detectTool();
+  if (tool !== "cwebp") {
+    throw new Error("Brak cwebp w środowisku — nie można bezpiecznie generować lekkich miniatur.");
   }
 
-  // Fallback when cwebp is unavailable in runtime image.
-  // We still persist the file under the expected variant name so URLs remain stable.
-  await fs.writeFile(outputAbsolutePath, sourceBuffer);
+  let bestOutput: Buffer | null = null;
+
+  for (const attempt of attempts) {
+    const output = await renderWithCwebp(attempt.width, attempt.quality);
+    bestOutput = output;
+    if (!isThumb) break;
+    if (output.length <= THUMB_SOFT_MAX_BYTES) break;
+    if (output.length <= THUMB_RETRY_MAX_BYTES && attempt === attempts[attempts.length - 1]) break;
+  }
+
+  if (!bestOutput) {
+    throw new Error(`Nie udało się wygenerować wariantu ${options.variant} dla ${outputAbsolutePath}`);
+  }
+
+  if (isThumb && bestOutput.length > THUMB_HARD_MAX_BYTES) {
+    throw new Error(`Miniatura przekracza limit ${THUMB_HARD_MAX_BYTES} B: ${outputAbsolutePath} (${bestOutput.length} B)`);
+  }
+
+  await fs.writeFile(outputAbsolutePath, bestOutput);
 };
 
 export const getImageProcessorInfo = async () => ({ tool: await detectTool() });
