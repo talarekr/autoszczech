@@ -25,7 +25,8 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
-    "prisma": "^5.18.0"
+    "prisma": "^5.18.0",
+    "sharp": "^0.34.4"
   },
   "devDependencies": {
     "typescript": "^5.4.5",
