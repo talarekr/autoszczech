@@ -432,12 +432,6 @@ export default function Home() {
           </p>
         )}
 
-        {isBackgroundLoading && !loading && (
-          <p className="rounded-3xl bg-blue-50 px-6 py-4 text-sm font-medium text-blue-700 shadow-sm">
-            Ładowanie kolejnych ofert… ({loadedCount}/{totalCount})
-          </p>
-        )}
-
         <div className="grid gap-6">
           {filteredCars.map((car) => (
             <CarCard key={car.id} car={car} />
