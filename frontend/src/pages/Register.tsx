@@ -31,7 +31,7 @@ const initialState: FormState = {
   email: "",
   password: "",
   confirmPassword: "",
-  phone: "+48",
+  phone: "",
   country: "pl",
   postalCode: "",
   city: "",
@@ -83,6 +83,7 @@ export default function Register() {
         email: payload.email.trim().toLowerCase(),
         firstName: payload.firstName.trim(),
         lastName: payload.lastName.trim(),
+        phone: payload.phone.trim(),
       };
 
       await axios.post(`${apiUrl}/api/auth/register`, {
