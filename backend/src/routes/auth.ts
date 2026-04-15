@@ -15,6 +15,11 @@ r.post("/register", async (req: Request, res: Response) => {
   const { email, password, firstName, lastName, ...rest } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: "Email i hasło wymagane" });
 
+  const phone = typeof rest.phone === "string" ? rest.phone.trim() : "";
+  if (!phone || phone.replace(/\D/g, "").length < 6) {
+    return res.status(400).json({ error: "Numer telefonu jest wymagany" });
+  }
+
   const trimmedEmail = String(email).trim().toLowerCase();
   const exists = await prisma.user.findUnique({ where: { email: trimmedEmail } });
   if (exists) return res.status(409).json({ error: "Użytkownik istnieje" });
@@ -28,7 +33,7 @@ r.post("/register", async (req: Request, res: Response) => {
       firstName: typeof firstName === "string" ? firstName.trim() || null : null,
       lastName: typeof lastName === "string" ? lastName.trim() || null : null,
       registrationStatus: RegistrationStatus.PENDING,
-      registrationForm: Object.keys(rest).length > 0 ? rest : null,
+      registrationForm: Object.keys(rest).length > 0 ? { ...rest, phone } : null,
     },
   });
 
