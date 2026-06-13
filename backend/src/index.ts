@@ -117,6 +117,16 @@ app.use(
 );
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
+app.get("/api/settings/maintenance", async (_req, res) => {
+  const setting = await prisma.siteSetting.findUnique({ where: { key: "maintenanceMode" } });
+  const enabled = Boolean(
+    setting?.value &&
+      typeof setting.value === "object" &&
+      !Array.isArray(setting.value) &&
+      (setting.value as { enabled?: boolean }).enabled
+  );
+  res.json({ enabled });
+});
 app.get("/api/diagnostics/image-processor", async (_req, res) => {
   const info = await getImageProcessorInfo();
   res.json(info);

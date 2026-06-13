@@ -132,3 +132,10 @@ model ImportJob {
   errors      Json?
   processedAt DateTime @default(now())
 }
+
+
+model SiteSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
