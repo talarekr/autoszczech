@@ -7,6 +7,13 @@ import { sendAccountApprovedEmail } from "../lib/mailer.js";
 
 const insurers = ["AXA", "ALLIANZ", "SCC", "BEST", "REST"] as const;
 
+const MAINTENANCE_SETTING_KEY = "maintenanceMode";
+
+type MaintenanceSettingValue = { enabled?: boolean };
+
+const parseMaintenanceEnabled = (value: Prisma.JsonValue | null | undefined) =>
+  Boolean(value && typeof value === "object" && !Array.isArray(value) && (value as MaintenanceSettingValue).enabled);
+
 type Insurer = (typeof insurers)[number];
 
 const normalizeProvider = (value: unknown): Insurer | undefined => {
@@ -16,6 +23,24 @@ const normalizeProvider = (value: unknown): Insurer | undefined => {
 };
 
 const r = Router();
+
+
+r.get("/settings/maintenance", auth("ADMIN"), async (_req: Request, res: Response) => {
+  const setting = await prisma.siteSetting.findUnique({ where: { key: MAINTENANCE_SETTING_KEY } });
+  res.json({ enabled: parseMaintenanceEnabled(setting?.value) });
+});
+
+r.patch("/settings/maintenance", auth("ADMIN"), async (req: Request, res: Response) => {
+  const enabled = Boolean(req.body?.enabled);
+
+  const setting = await prisma.siteSetting.upsert({
+    where: { key: MAINTENANCE_SETTING_KEY },
+    create: { key: MAINTENANCE_SETTING_KEY, value: { enabled } },
+    update: { value: { enabled } },
+  });
+
+  res.json({ enabled: parseMaintenanceEnabled(setting.value), updatedAt: setting.updatedAt });
+});
 
 r.get("/auctions", auth("ADMIN"), async (req: Request, res: Response) => {
   const provider = normalizeProvider(req.query.provider);

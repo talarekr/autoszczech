@@ -26,7 +26,7 @@ const statusTone: Record<WinnerStatus, string> = {
 };
 
 const insurersFallback = ["AXA", "ALLIANZ", "SCC", "BEST", "REST"];
-type AdminSection = "AUCTIONS" | "CLIENTS" | "WON_AUCTIONS";
+type AdminSection = "AUCTIONS" | "CLIENTS" | "WON_AUCTIONS" | "MAINTENANCE";
 
 export default function Admin() {
   const { t } = useTranslation();
@@ -58,6 +58,11 @@ export default function Admin() {
   const [wonAuctions, setWonAuctions] = useState<WonAuction[]>([]);
   const [wonAuctionsLoading, setWonAuctionsLoading] = useState(false);
   const [wonAuctionsError, setWonAuctionsError] = useState<string | null>(null);
+  const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
+  const [maintenanceLoading, setMaintenanceLoading] = useState(false);
+  const [maintenanceSaving, setMaintenanceSaving] = useState(false);
+  const [maintenanceError, setMaintenanceError] = useState<string | null>(null);
+  const [maintenanceSuccess, setMaintenanceSuccess] = useState<string | null>(null);
 
   const isAdmin = isLoggedIn && userRole === "ADMIN";
 
@@ -402,6 +407,12 @@ export default function Admin() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSection, token, isAdmin]);
 
+  useEffect(() => {
+    if (activeSection !== "MAINTENANCE") return;
+    fetchMaintenanceSetting();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSection, token, isAdmin]);
+
   const handleSetWinner = async (carId: number, offerId: number, status: WinnerStatus) => {
     if (!token || !isAdmin) return;
     setSaving({ carId, offerId, status });
@@ -501,6 +512,57 @@ export default function Admin() {
       setClientsError(t("admin.clients.rejectError"));
     } finally {
       setRejectingUserId(null);
+    }
+  };
+
+
+  const fetchMaintenanceSetting = async () => {
+    if (!token || !isAdmin) {
+      setMaintenanceError("Wymagane są uprawnienia administratora.");
+      return;
+    }
+
+    setMaintenanceLoading(true);
+    setMaintenanceError(null);
+
+    try {
+      const apiUrl = await getApiUrl();
+      const response = await axios.get<{ enabled: boolean }>(`${apiUrl}/api/admin/settings/maintenance`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setMaintenanceEnabled(Boolean(response.data.enabled));
+    } catch (err) {
+      console.error("Nie udało się pobrać ustawień przerwy technicznej", err);
+      setMaintenanceError("Nie udało się pobrać ustawień przerwy technicznej.");
+    } finally {
+      setMaintenanceLoading(false);
+    }
+  };
+
+  const handleMaintenanceToggle = async (enabled: boolean) => {
+    if (!token || !isAdmin) return;
+    setMaintenanceSaving(true);
+    setMaintenanceError(null);
+    setMaintenanceSuccess(null);
+
+    try {
+      const apiUrl = await getApiUrl();
+      const response = await axios.patch<{ enabled: boolean }>(
+        `${apiUrl}/api/admin/settings/maintenance`,
+        { enabled },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setMaintenanceEnabled(Boolean(response.data.enabled));
+      setMaintenanceSuccess(
+        response.data.enabled
+          ? "Przerwa techniczna została włączona dla użytkowników serwisu."
+          : "Przerwa techniczna została wyłączona."
+      );
+    } catch (err) {
+      console.error("Nie udało się zapisać ustawień przerwy technicznej", err);
+      setMaintenanceError("Nie udało się zapisać ustawień przerwy technicznej.");
+    } finally {
+      setMaintenanceSaving(false);
     }
   };
 
@@ -606,6 +668,20 @@ export default function Admin() {
             >
               {t("admin.wonAuctions.tab")}
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveSection("MAINTENANCE");
+                setExpandedAuction(null);
+              }}
+              className={`rounded-full px-4 py-2 text-sm font-semibold shadow-sm ring-1 transition ${
+                activeSection === "MAINTENANCE"
+                  ? "bg-neutral-900 text-white ring-neutral-800"
+                  : "bg-white text-neutral-700 ring-neutral-200 hover:bg-red-50 hover:text-red-700"
+              }`}
+            >
+              Przerwa techniczna
+            </button>
           </div>
           <button
             type="button"
@@ -614,6 +690,8 @@ export default function Admin() {
                 ? fetchAuctions(activeInsurer)
                 : activeSection === "CLIENTS"
                   ? fetchPendingUsers()
+                  : activeSection === "MAINTENANCE"
+                  ? fetchMaintenanceSetting()
                   : fetchWonAuctions()
             }
             className="ml-auto inline-flex items-center justify-center rounded-full bg-neutral-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-neutral-800"
@@ -992,6 +1070,47 @@ export default function Admin() {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        ) : activeSection === "MAINTENANCE" ? (
+          <div className="space-y-4">
+            {maintenanceError && <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{maintenanceError}</div>}
+            {maintenanceSuccess && <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{maintenanceSuccess}</div>}
+            <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-5">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.3em] text-neutral-500">Tryb serwisowy</p>
+                  <h3 className="text-lg font-semibold text-neutral-900">Przerwa techniczna serwisu</h3>
+                  <p className="max-w-2xl text-sm text-neutral-600">
+                    Po włączeniu użytkownicy zobaczą logo AutoSzczech oraz komunikat: „Trwają prace serwisowe. Zapraszamy wkrótce”. Panel admina i logowanie pozostają dostępne.
+                  </p>
+                </div>
+                <label className="inline-flex cursor-pointer items-center gap-3 rounded-full bg-white px-4 py-3 text-sm font-semibold text-neutral-800 shadow-sm ring-1 ring-neutral-200">
+                  <span>OFF</span>
+                  <input
+                    type="checkbox"
+                    checked={maintenanceEnabled}
+                    disabled={maintenanceLoading || maintenanceSaving}
+                    onChange={(event) => handleMaintenanceToggle(event.target.checked)}
+                    className="peer sr-only"
+                  />
+                  <span
+                    className={`relative h-7 w-12 rounded-full transition ${
+                      maintenanceEnabled ? "bg-red-600" : "bg-neutral-300"
+                    } ${maintenanceLoading || maintenanceSaving ? "opacity-60" : ""}`}
+                  >
+                    <span
+                      className={`absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow transition ${
+                        maintenanceEnabled ? "translate-x-5" : ""
+                      }`}
+                    />
+                  </span>
+                  <span>ON</span>
+                </label>
+              </div>
+              <p className="mt-4 text-sm font-semibold text-neutral-700">
+                Aktualny status: {maintenanceEnabled ? "ON — przerwa techniczna włączona" : "OFF — serwis działa normalnie"}
+              </p>
             </div>
           </div>
         ) : (

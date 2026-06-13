@@ -4,6 +4,7 @@ import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { ChfPlnCalculator } from "./components/ChfPlnCalculator";
+import { getApiUrl } from "./lib/api";
 import { useAuth } from "./contexts/AuthContext";
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -24,6 +25,8 @@ export default function App() {
   const isReady = ready && i18n.isInitialized;
   const [isAuthMenuOpen, setIsAuthMenuOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [maintenanceLoading, setMaintenanceLoading] = useState(true);
+  const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
   const authMenuRef = useRef<HTMLDivElement | null>(null);
   const location = useLocation();
   const currentLanguage = normalizeLanguageCode(i18n.language.split("-")[0]);
@@ -58,12 +61,51 @@ export default function App() {
     setIsMobileNavOpen(false);
   }, [location.pathname]);
 
+  useEffect(() => {
+    let ignore = false;
+
+    const fetchMaintenanceStatus = async () => {
+      try {
+        const apiUrl = await getApiUrl();
+        const response = await fetch(`${apiUrl}/api/settings/maintenance`, { cache: "no-store" });
+        if (!response.ok) return;
+        const data = (await response.json()) as { enabled?: boolean };
+        if (!ignore) setMaintenanceEnabled(Boolean(data.enabled));
+      } catch (error) {
+        console.error("Nie udało się pobrać statusu przerwy technicznej", error);
+      } finally {
+        if (!ignore) setMaintenanceLoading(false);
+      }
+    };
+
+    fetchMaintenanceStatus();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const isAdminPath = location.pathname.startsWith("/admin") || location.pathname.startsWith("/login");
+
   if (!isReady) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-neutral-100 text-neutral-500">
         <span className="animate-pulse text-sm font-semibold uppercase tracking-[0.4em]">
           AUTOSZCZECH
         </span>
+      </div>
+    );
+  }
+
+  if (!maintenanceLoading && maintenanceEnabled && !isAdminPath) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-neutral-100 px-6">
+        <div className="flex max-w-xl flex-col items-center rounded-3xl bg-white p-10 text-center shadow-xl shadow-black/5 ring-1 ring-neutral-200">
+          <img src="/logo.png" alt="AutoSzczech.ch" className="mb-8 h-28 w-auto object-contain" />
+          <p className="text-xl font-semibold text-neutral-900 md:text-2xl">
+            Trwają prace serwisowe. Zapraszamy wkrótce
+          </p>
+        </div>
       </div>
     );
   }
